@@ -48,7 +48,7 @@ def dump_file(path: str, game_root: str, bridge_dir: str, work_dir: str, max_dep
     cp = os.pathsep.join([jar, classes])
     proc = subprocess.run(
         [java, "-cp", cp, "SaveDump", path, str(max_depth)],
-        capture_output=True, text=True, timeout=180,
+        capture_output=True, text=True, encoding="utf-8", timeout=180,
     )
     if proc.returncode != 0:
         raise RuntimeError(f"SaveDump failed ({proc.returncode}): {proc.stderr[:500]}")

@@ -68,25 +68,44 @@
 ```
 
 ### 3.1 循环骨架（main.py）
-1. 等待/确认游戏主界面 → 定位窗口；
+1. 启动游戏（`start_game.bat`，带 AgentBridge 注入）→ 等待 `/state` 端点就绪；
 2. 每回合：
-   a. 等到新存档落盘（watchdog 见 `TS/` 变化或轮询 `_S` 行数增长）；
-   b. `game_bridge` dump `_S` 尾行 + 新 `_C_k` → JSON；
+   a. 轮询 AgentBridge `/state` 或新存档落盘（watchdog 见 `TS/` 变化）断言回合边界；
+   b. `game_bridge` dump `_S` 尾行 + 新 `_C_k` → JSON（数据归档用）；
    c. 组装 `TurnContext`（我方统计/相邻文明/敌方值/上回合决策回执/旁白历史）；
    d. LLM 决策 → 结构化指令 `[{action, params}]`（1~5 条）；
-   e. `executor` 逐条模拟输入执行（含自查截图）；
+   e. `agent/actions.py` 映射为 AgentBridge HTTP 命令逐条执行（引擎内部直调，可靠无竞态）；
    f. agent 侧把决策写入 `jsonl`，回合记录器写全量 `turn_{n}.json`；
-   g. 模拟点击「结束回合」→ 回到 a；
-3. 异常兜底：执行失败 → 截图 + 状态回读重试（最多 2 次）→ 若仍失败则触发 LLM「恢复再调度」。
+   g. 调 `endTurn`（引擎 API）→ 回到 a；
+3. 异常兜底：引擎回执失败 → 状态回读重试（最多 2 次）→ 若仍失败则触发 LLM「恢复再调度」。
 
-### 3.2 动作空间（agent/actions.py）
-高语义动作（从反编译源码 `Button_*`、`Game_Action` 提取），第一版先做最重要子集：
-- 外交：宣战、和谈、结盟提议、请求通行、要求进贡；
-- 建设：投资省份（boost）、修铁路/飞机场（省份 UI）；
-- 军事：征募/解散军队、移动军队到省、执行回合内聚合命令（`moveAtWar` 指令）；
-- 内政：设置国家政策/贸易路线（后续扩展）；
-- 控制：结束回合、打开/关闭菜单。
-每个动作 = 动作名 + 参数 + 执行脚本（按钮坐标序列），坐标由「计算+校准截图」得出并存入 `ui_profiles/{resolution}.json`。
+> 旁观者模式：Agent 不占用鼠标/键盘；任何人可随时用鼠标点击地图查看省份/文明信息（交互在 GTK 渲染线程，
+> Agent 命令在 GL 主循环队列消费，互不阻塞）。
+
+### 3.2 动作空间（agent/actions.py）—— 引擎 API 直调（JVM 注入桥）
+
+**决策（2026-08-23 用户确认）**：Agent 不模拟人手点击；玩家操作基于游戏自身 Java API 直调
+（注入 AgentBridge 于游戏进程内）；鼠标、键盘留给旁观者（用户）自由查看地图/信息。
+核心动作 → 真实 API（均来自反编译源码/引擎 AI 实际调用，签名已验证）：
+
+| 动作 | 引擎调用（运行于游戏 JVM） |
+|---|---|
+| 宣战 | `CFG.game.declareWar(myCivID, targetCivID, false)` |
+| 征兵 | `CFG.game.getCiv(myCivID).recruitArmy_AI(provinceID, count)` |
+| 军队移动 | `CFG.gameAction.moveArmy(fromProvinceID, toProvinceID, armyCount, civID, true, false)` |
+| 投资省份 | `DiplomacyManager.invest(provinceID, myCivID, gold)` |
+| 结束回合 | `CFG.gameAction.tryToTakeNexTurn()`（安全入口，含消息检查/暂停） |
+| 和谈 | `DiplomacyManager.sendPeaceTreaty(...)`（条约结构，M3 细化） |
+| 结盟提议 | 消息系统 `Message_*Alliance`（M3 细化） |
+
+**AgentBridge 设计**：
+- Java 组件（注入游戏 JVM）：本地 HTTP(127.0.0.1, 固定端口) 接收命令 JSON；命令入队；`ClassFileTransformer`
+  对 `AoCGame.render()` 头部注入 `AgentBridge.tick()`——GL 主线程轮询队列并调引擎 API（避免跨线程竞态）。
+- 状态查询：同一 HTTP 端点 `/state` → 引擎只读 API（`CFG.game.getCiv*`/`getProvince*`/`getArmies`）
+  序列化为 JSON（复用 SaveDump 反射 writer 思路，只取公开数据类）。
+- 旁白：同组件 `/narration` 接收旁白 → `CFG.toast.setInView(text, color)`（游戏内弹窗）。
+- 旁白+命令 = 单一注入组件（`game_bridge` 内 `agent_bridge/` 目录，bootstrap 可选用
+  `java -javaagent:agent-bridge.jar -jar AoC2.exe` 启动器 `start_game.bat`，不动原 exe）。
 
 ### 3.3 LLM Provider（agent/llm/）
 - `base.py`：`LLMProvider.choose_action(context) -> list[Action]`，JSON schema 强约束输出；
@@ -140,9 +159,11 @@
 
 ## 6. 技术选型
 
-- Python 3.11（本机已备）；依赖 `watchdog`（fs 变化）、`Pillow`、`requests`/`httpx`（LLM）、`pyyaml`；屏幕截图可用内置 API 或 `mss`；输入用 `win32api`（pywin32）或纯 `user32` ctypes —— 选 **ctypes 零依赖**（已验证 mouse_event 链路）。
+- Python 3.11（本机已备）；依赖 `watchdog`（fs 变化）、`Pillow`、`requests`/`httpx`（LLM）、`pyyaml`；屏幕截图已实现 ctypes `PrintWindow`（后台抓帧，不占用前台）。
 - Java：`SaveDump.java` 单文件，`javac --release 8` 编译，运行于游戏自带 JRE（classpath 含 `aoc2.jar`）。
-- 游戏注入桥：Java8 字节码，类名 `age.of.civilizations2.jakowski.lukasz.NarrationBridge`（新增类，不改原逻辑）。
+- 游戏注入桥（AgentBridge）：`javaagent` + `ClassFileTransformer`（ASM，注入 `AoCGame.render()` → `AgentBridge.tick()`）+ 内置 HTTP Server（`com.sun.net.httpserver`，JDK8 自带，零外部依赖）+ 命令队列，双职责：Agent 命令执行 + 旁白 toast。
+- 启动器：`start_game.bat` → `jre\bin\javaw.exe -javaagent:agent-bridge.jar -jar AoC2.exe`（不修改原 exe，双击原生启动时桥未加载、一切照旧）。
+- **不采用**：模拟键鼠输入（pyautogui/SendInput/mouse_event）——全部废弃，Agent 直调引擎 API。
 
 ## 7. 合规与风险
 

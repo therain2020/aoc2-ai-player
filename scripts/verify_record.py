@@ -34,17 +34,8 @@ def main():
     def dump(path, max_depth=8):
         return dump_file(str(path), args.game_root, bridge_dir, work_dir, max_depth)
 
-    stats, periods = load_turn_dataset(dump, save_set, tag)
-    for i, p in enumerate(periods):
-        if isinstance(p, dict):
-            ltc = p.get("lTurnChanges", [])
-            itypes = [type(x).__name__ for x in ltc]
-            print(f"period[{i}] turns={len(ltc)} elem_types={itypes[:5]}")
-            if ltc and isinstance(ltc[0], list):
-                elem_types = sorted({type(x).__name__ for x in ltc[0]})
-                strs = [x for x in ltc[0] if isinstance(x, str)]
-                print(f"  turn0 elems={len(ltc[0])} types={elem_types} strings={strs[:3]}")
-    turns = build_turns(stats, periods, meta={"save_tag": tag, "map": args.map})
+    stats, capitals, periods = load_turn_dataset(dump, save_set, tag)
+    turns = build_turns(stats, capitals, periods, meta={"save_tag": tag, "map": args.map})
     print(f"save_tag={tag} turns={len(turns)} periods={len(periods)}")
 
     sess = create_session(args.session_dir, args.map, tag)

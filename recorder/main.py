@@ -7,7 +7,7 @@ import time
 
 from recorder import session
 from recorder.saves import SaveSet
-from recorder.turn_logger import load_turn_dataset, build_turns, write_jsonl, write_turn_file
+from recorder.turn_logger import load_turn_dataset, build_turns, write_jsonl, write_turn_file, max_turn_from_capitals
 from recorder.screenshots import find_window, capture
 
 
@@ -23,7 +23,7 @@ def poll_loop(game_root, map_name, session_dir, screenshot=False, poll_sec=1.0):
         return dump_file(str(path), game_root, bridge_dir, work_dir, max_depth)
 
     save_set = SaveSet(game_root, map_name)
-    state = {"tag": None, "rows": -1, "session": None}
+    state = {"tag": None, "abs_turn": -1, "session": None}
 
     while True:
         tag = save_set.newest_save()
@@ -31,22 +31,22 @@ def poll_loop(game_root, map_name, session_dir, screenshot=False, poll_sec=1.0):
             time.sleep(poll_sec)
             continue
         try:
-            stats, periods = load_turn_dataset(dump, save_set, tag)
+            stats, capitals, periods = load_turn_dataset(dump, save_set, tag)
+            abs_turn = max_turn_from_capitals(capitals)
         except Exception as e:
             print(f"dump failed: {e}")
             time.sleep(poll_sec)
             continue
 
-        num_turns = len(stats.get("lProvinces", []))
         if tag != state["tag"]:
             state["tag"] = tag
-            state["rows"] = -1
+            state["abs_turn"] = -1
             state["session"] = session.create_session(session_dir, map_name, tag)
             print(f"new save {tag} -> session {state['session']}")
 
-        if num_turns > state["rows"]:
-            turns = build_turns(stats, periods, meta={"save_tag": tag, "map": map_name})
-            new_turns = turns[state["rows"] + 1:] if state["rows"] >= 0 else turns
+        if abs_turn > state["abs_turn"]:
+            turns = build_turns(stats, capitals, periods, meta={"save_tag": tag, "map": map_name})
+            new_turns = [t for t in turns if t["turn"] > state["abs_turn"]]
             if new_turns:
                 write_jsonl(state["session"], new_turns)
                 for t in new_turns:
@@ -56,10 +56,10 @@ def poll_loop(game_root, map_name, session_dir, screenshot=False, poll_sec=1.0):
                 hwnd = find_window("Age of Civilizations II")
                 if hwnd:
                     try:
-                        capture(hwnd, state["session"] / "turns" / f"turn_{num_turns-1:05d}.png")
+                        capture(hwnd, state["session"] / "turns" / f"turn_{abs_turn:05d}.png")
                     except Exception as e:
                         print(f"screenshot failed: {e}")
-            state["rows"] = num_turns
+            state["abs_turn"] = abs_turn
         time.sleep(poll_sec)
 
 

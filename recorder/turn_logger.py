@@ -15,22 +15,40 @@ STATS_V1 = {
 }
 
 
+def max_turn_from_capitals(capitals_dump) -> int:
+    """Absolute turn id from _T dump (max iSinceTurnID across civs)."""
+    best = 0
+    for civ in capitals_dump.get("lCivsCapitals", []):
+        for cap in civ.get("lCapitals", []):
+            t = cap.get("iSinceTurnID", 0)
+            if t > best:
+                best = t
+    return best
+
+
 def load_turn_dataset(dump, save_set: SaveSet, save_tag: str, max_depth: int = 8):
-    """Dump _S and all _C_* files once; return raw parsed structures."""
+    """Dump _S/_T and all _C_* files; return raw parsed structures.
+
+    _S rows are a sliding window (GRAPH_DATA_LIMIT_PROVINCES=100): row index
+    alone cannot define the turn. _T records absolute turn ids (iSinceTurnID)
+    and is never truncated, so it anchors absolute turn numbering.
+    """
     paths = save_set.paths(save_tag)
     stats = json.loads(dump(str(paths["stats"]), max_depth=max_depth)) if paths["stats"].exists() else {}
+    capitals = json.loads(dump(str(paths["capitals"]), max_depth=4)) if paths["capitals"].exists() else {}
     periods = []
     for fp in save_set.turn_change_files(save_tag):
         try:
             periods.append(json.loads(dump(str(fp), max_depth=max_depth)))
         except Exception:
             periods.append(None)
-    return stats, periods
+    return stats, capitals, periods
 
 
-def build_turns(stats, periods, meta=None):
+def build_turns(stats, capitals, periods, meta=None):
     """Flatten stats rows + turn-change periods into per-turn dicts."""
-    num_turns = len(stats.get("lProvinces", []))
+    abs_turn = max_turn_from_capitals(capitals)
+    num_rows = len(stats.get("lProvinces", []))
     turns = []
     period_turns = []
     for period in periods:
@@ -44,14 +62,19 @@ def build_turns(stats, periods, meta=None):
         for turn_changes in period_turn_list:
             changes_by_turn.append(parse_turn_changes(turn_changes))
 
-    for r in range(max(num_turns, len(changes_by_turn))):
+    num_turns = max(num_rows, len(changes_by_turn))
+    for r in range(num_turns):
         row = {}
         for key, attr in STATS_V1.items():
             rows = stats.get(attr, [])
             row[key] = rows[r] if r < len(rows) else []
         changes = changes_by_turn[r] if r < len(changes_by_turn) else []
+        # absolute turn: _S window offset +1 (row 0 == absolute turn 1)... via _T anchor
+        abs_anchor = abs_turn >= num_rows
+        turn_id = r + 1 if abs_anchor or num_rows <= abs_turn + 1 else r
         turn = {
-            "turn": r,
+            "turn": turn_id,
+            "abs_turn": abs_turn,
             "stats": row,
             "changes": changes,
             "player_civ": None,

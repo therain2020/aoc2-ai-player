@@ -1,12 +1,20 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "aoc2-ai-player"
 version = "0.1.0"
-description = "LLM agent that plays Age of Civilizations II (Java), with per-turn recording, narration and video pipeline"
+description = "LLM agent that plays Age of Civilizations II (Java) via engine-API bridge, with per-turn recording, narration and video pipeline"
 requires-python = ">=3.11"
+readme = "README.md"
 
 [project.optional-dependencies]
-full = ["Pillow", "PyYAML"]
+full = ["Pillow", "PyYAML", "httpx"]
 llm = ["httpx"]
+
+[tool.setuptools.packages.find]
+include = ["recorder*", "agent*", "narrator*", "video*"]
 
 [tool.pyright]
 pythonpath = ["."]

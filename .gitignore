@@ -17,6 +17,7 @@ game_bridge/build/
 game_bridge/*.class
 game_bridge/aoc2.jar
 .bridge/
+game_bridge/agent_bridge/build/
 
 # OS
 Thumbs.db

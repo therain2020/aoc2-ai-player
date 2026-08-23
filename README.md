@@ -15,17 +15,20 @@
 - `TS/TURN/<id>_C_<n>` —— 每回合省份易主事件
 
 `game_bridge/SaveDump`（Java，运行于游戏自带 JRE）把存档反序列化为 JSON，
-Python 侧消费后供 Agent 决策与录制。
+供离线回放与数据归档；**Agent 的实时操作通过 AgentBridge（javaagent 注入）
+直调游戏引擎 API**（宣战/征兵/移动/投资/结束回合），不占用键鼠——旁观者可自由
+点击地图查看信息。
 
 ```
-感知(SaveDump)→ 状态组装 → LLM 决策 → 模拟输入执行 → 回合循环
-                                    └→ 每回合 JSONL + 截图 + 旁白
+AgentBridge(引擎 API 直调) ← /state、/action ← LLM 决策循环
+                                        ↓
+       每回合 JSONL + 截图（后台抓帧）+ 旁白(toast 弹窗 + 时间轴)
 ```
 
 ## 快速开始
 
 ```bash
-pip install -r requirements.txt        # 或 pip install -e '.[full]'
+pip install -e .                       # Python 3.11
 cp config.yaml.template config.yaml    # 填 game.root / llm 配置
 python -m recorder.main                # 监控并录制已打开的游戏存档
 ```
@@ -33,9 +36,10 @@ python -m recorder.main                # 监控并录制已打开的游戏存档
 ## 目录结构
 
 - `game_bridge/`   存档反序列化桥（SaveDump.java, build.bat, dump_save.py）
+- `game_bridge/agent_bridge/`  AgentBridge 注入组件（javaagent：引擎 API + toast + 旁白）
 - `recorder/`      回合录制（turn_logger, watcher, screenshots, session）
 - `agent/`         LLM 决策循环（llm/ provider 抽象：OpenAI 兼容 / Ollama）
-- `narrator/`      旁白引擎（事件模板 + LLM 短评 + 游戏内 toast 桥）
+- `narrator/`      旁白引擎（事件模板 + LLM 短评 + toast 通道）
 - `video/`         ffmpeg 素材合成
 
 ## 里程碑
