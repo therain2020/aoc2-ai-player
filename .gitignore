@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Config with secrets
+config.yaml
+config.local.yaml
+
+# Session data
+sessions/
+screenshots/
+
+# Java build output + extracted game jar (local only)
+game_bridge/build/
+game_bridge/*.class
+game_bridge/aoc2.jar
+.bridge/
+
+# OS
+Thumbs.db
+.DS_Store

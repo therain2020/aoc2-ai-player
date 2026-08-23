@@ -1,0 +1,12 @@
+[project]
+name = "aoc2-ai-player"
+version = "0.1.0"
+description = "LLM agent that plays Age of Civilizations II (Java), with per-turn recording, narration and video pipeline"
+requires-python = ">=3.11"
+
+[project.optional-dependencies]
+full = ["Pillow", "PyYAML"]
+llm = ["httpx"]
+
+[tool.pyright]
+pythonpath = ["."]

@@ -1,0 +1,24 @@
+# 复制为 config.yaml 并填写
+game:
+  root: "C:/path/to/Age of History II"          # 游戏根目录（含 AoC2.exe）
+  map: "Earth"                                   # 当前游玩地图目录名（Earth / Asia / ...）
+  window_title: "Age of Civilizations II"        # 游戏进程窗口标题
+  autosave_every_turn: true                      # 引导将自动存档间隔设为 1（M2 提供自动引导）
+
+llm:
+  provider: openai_compat                        # openai_compat | ollama
+  temperature: 0.7
+  openai_compat:
+    base_url: "https://api.deepseek.com/v1"
+    model: "deepseek-chat"
+    api_key: "REPLACE_WITH_API_KEY"              # 或用环境变量 DEEPSEEK_API_KEY
+  ollama:
+    base_url: "http://localhost:11434"
+    model: "qwen2.5:7b"
+
+narration:
+  mode: hybrid                                   # template | llm | hybrid
+  lang: zh
+
+session:
+  dir: "./sessions"
