@@ -19,7 +19,7 @@ sys.path.insert(0, str(REPO))
 import yaml  # noqa: E402
 
 from agent.actions import (  # noqa: E402
-    execute, parse_actions, parse_plan, SKILL_CAPS, ActionError,
+    execute, parse_actions, parse_plan, result_ok, SKILL_CAPS, ActionError,
 )
 from agent.bridge_client import wait_until_up, BridgeError  # noqa: E402
 from agent.llm import create_provider  # noqa: E402
@@ -67,10 +67,13 @@ def _auto_invest_tech(bridge, st):
         if int(skills.get(cat, 0) or 0) >= SKILL_CAPS.get(cat, 99):
             continue
         r = bridge.invest_tech(cat, pts)
-        if str(r).startswith("OK"):
+        if result_ok(r):
             done = 0
             try:
-                done = int(r.split("|")[-1])
+                log = r.strip()
+                if log.startswith("{"):
+                    log = json.loads(log).get("log", "")
+                done = int(log.split("|")[-1])
             except (ValueError, IndexError):
                 pass
             if done > 0:
@@ -78,7 +81,8 @@ def _auto_invest_tech(bridge, st):
                 pts -= done
                 continue
         r1 = bridge.invest_tech(cat, 1)
-        if not str(r1).startswith("OK") or not str(r1).endswith("|1"):
+        ok1 = result_ok(r1) and str(r1).strip().endswith("|1")
+        if not ok1:
             break
         spent += 1
         pts -= 1
@@ -152,7 +156,7 @@ class WarTracker:
 
     def note_results(self, turn: int, results: list, prev_provinces: int, now_provinces: int):
         for r in results:
-            if r.get("action") == "move_army" and str(r.get("result", "")).startswith("OK"):
+            if r.get("action") == "move_army" and result_ok(r.get("result", "")):
                 self.last_battle = turn
         if now_provinces > prev_provinces:
             self.last_conquest = turn
@@ -277,7 +281,9 @@ def main():
         while True:
             st = json.loads(bridge.state())
             ts = st.get("turn_state")
-            if st.get("game_end"):
+            ge = st.get("game_end")
+            ended = ge is True or (isinstance(ge, dict) and ge.get("ended") is True)
+            if ended:
                 time.sleep(10)
                 continue
             if ts != "INPUT_ORDERS":
@@ -357,7 +363,7 @@ def main():
                 results = execute(bridge, war_actions)
                 war_trk.note_results(cur, results, prev_provinces, st.get("provinces", 0))
                 prev_provinces = st.get("provinces", 0)
-                ok_n = sum(1 for r in results if str(r["result"]).startswith("OK"))
+                ok_n = sum(1 for r in results if result_ok(r["result"]))
                 print(f"  war actions {ok_n}/{len(results)} ok: "
                       f"{[r['action'] for r in results]}", flush=True)
                 bridge.toast(f"[战争回合{cur}] 已执行 {ok_n}/{len(results)}")
@@ -478,7 +484,7 @@ def main():
             print(f"--- executing turn {cur} (plan {entry['note'] or ''}) ---", flush=True)
 
             results = execute(bridge, entry_actions)
-            ok_state = [r for r in results if str(r["result"]).startswith("OK")]
+            ok_state = [r for r in results if result_ok(r["result"])]
             print(f"  executed {len(ok_state)}/{len(results)} ok", flush=True)
             balance = provider.fetch_balance() if getattr(provider, "track_balance", False) else None
             u = provider.last_usage

@@ -44,8 +44,9 @@ def render(turns: list, session_name: str) -> str:
         actions = "".join(
             f'<span class="chip">{a.get("action")}: {json.dumps({k: v for k, v in a.items() if k != "action"}, ensure_ascii=False)}</span>'
             for a in t.get("decision", []))
+        from agent.actions import result_ok
         results = "".join(
-            f'<span class="res {("ok" if r.get("result","").startswith("OK") else "fail")}">{r.get("result", "")}</span>'
+            f'<span class="res {("ok" if result_ok(r.get("result", "")) else "fail")}">{r.get("result", "")}</span>'
             for r in t.get("results", []))
         # T041: mechanic-phase / tactic-ref 卡片（兼容旧行：字段缺失则不渲染）
         mech = ""

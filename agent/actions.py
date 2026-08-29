@@ -152,6 +152,25 @@ def execute(bridge, actions: list) -> list:
     return results
 
 
+def result_ok(res) -> bool:
+    """True if an engine receipt reports OK.
+
+    EngineGateway returns a JSON text {"result":"OK"|"FAIL","log":...,"detail":...};
+    the legacy bridge returned plain "OK|cmd|..." pipes — both are accepted.
+    """
+    if isinstance(res, str):
+        s = res.strip()
+        if s.startswith("{"):
+            try:
+                return json.loads(s).get("result") == "OK"
+            except (json.JSONDecodeError, AttributeError):
+                return False
+        return s.startswith("OK")
+    if isinstance(res, dict):
+        return res.get("result") == "OK"
+    return str(res).startswith("OK")
+
+
 def parse_plan(raw: str, max_turns: int = 10) -> dict:
     """Parse batch-plan LLM output: {brief, turns:[{offset, actions:[...]}]}.
 

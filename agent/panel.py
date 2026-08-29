@@ -63,7 +63,7 @@ def start_agent():
     log_f = open(LOG_FILE, "w", encoding="utf-8")
     env = dict(os.environ, PYTHONIOENCODING="utf-8")
     proc = subprocess.Popen(
-        [sys.executable, "-X", "utf8", "-m", "agent.main", "--max-plans", "0"],
+        [sys.executable, "-u", "-X", "utf8", "-m", "agent.main", "--max-plans", "0"],
         cwd=str(REPO), env=env, stdout=log_f, stderr=subprocess.STDOUT,
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
@@ -220,7 +220,8 @@ def show_status():
         if last is None:
             print(f"  session: {dn} | turns.jsonl 空文件")
         else:
-            ok = sum(1 for r in (last.get("results") or []) if str(r.get("result", "")).startswith("OK"))
+            from agent.actions import result_ok
+            ok = sum(1 for r in (last.get("results") or []) if result_ok(r.get("result", "")))
             print(f"  session: {dn} | turns.jsonl {rows} 行 | 最新 T{last.get('turn')} "
                   f"type={last.get('type')} brief={str(last.get('brief'))[:40]} "
                   f"ok={ok}/{len(last.get('results') or [])}")

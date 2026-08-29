@@ -115,3 +115,17 @@ def test_parse_actions_new_l1_actions():
     assert acts[0] == {"action": "send_gift", "target_civ_id": 4, "gold": 200}
     assert acts[1] == {"action": "form_civilization"}
     assert acts[2]["against_civ_id"] == 5
+
+
+def test_result_ok_accepts_all_receipt_shapes():
+    from agent.actions import result_ok
+    # EngineGateway JSON text receipt
+    assert result_ok('{"result":"OK","log":"OK|recruitArmy|1957|10","detail":{}}')
+    assert not result_ok('{"result":"FAIL","log":"FAIL|invest|1958|100","detail":{}}')
+    # legacy pipe receipt
+    assert result_ok("OK|invest|1|2")
+    assert not result_ok("FAIL|moveArmy|1|2|3")
+    # dict receipt (in-test doubles)
+    assert result_ok({"result": "OK"})
+    assert not result_ok({"result": "FAIL"})
+    assert not result_ok("not a receipt")
