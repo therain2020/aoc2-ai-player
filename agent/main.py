@@ -179,6 +179,30 @@ def str_sig(s: str) -> str:
     return hashlib.md5((s or "").encode("utf-8")).hexdigest()
 
 
+def _fill_empty_turns(plan: dict, st: dict) -> None:
+    """Root-cause fix for `0/0 -> replan`: LLM often omits actions for
+    repetitive turns (only note). Fill them instead of failing the plan."""
+    if not plan.get("turns"):
+        return
+    last_act = None
+    for t in plan["turns"]:
+        if t.get("actions"):
+            last_act = t["actions"][0]
+            continue
+        if int(st.get("tech_points") or 0) > 0:
+            t["actions"] = [{"action": "invest_tech", "category": "research", "count": 5}]
+            t["note"] = (t.get("note") or "") + "；[fill]投科技点"
+        elif last_act:
+            t["actions"] = [dict(last_act)]
+            t["note"] = (t.get("note") or "") + "；[fill]延续"
+        else:
+            provs = st.get("my_provinces") or [0]
+            t["actions"] = [{"action": "recruit_army",
+                             "province_id": int(provs[0]), "count": 50}]
+            t["note"] = (t.get("note") or "") + "；[fill]征兵守卫"
+        print(f"  filled empty turn {t['offset']} -> {t['actions'][0]['action']}", flush=True)
+
+
 def _plan_has_response(plan: dict) -> bool:
     """Plan already carries any threat-response/capability action (loose match)."""
     for t in plan.get("turns", []):
@@ -533,6 +557,7 @@ def main():
                         record_skip(cur, phase, ledger, f"plan invalid x2: {e2}")
                         continue
                 fail_streak = 0
+                _fill_empty_turns(plan, st)
                 plan["base_provinces"] = st.get("provinces", 0)
                 plan["start_turn"] = cur
                 planned_turn = cur + len(plan["turns"]) - 1

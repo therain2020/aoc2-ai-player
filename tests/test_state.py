@@ -162,6 +162,20 @@ def test_victory_progress_block_contents(tmp_path):
     assert "省净+2" in line or "净+" in line
 
 
+def test_fill_empty_turns():
+    from agent.main import _fill_empty_turns
+    plan = {"turns": [{"offset": 1, "actions": [{"action": "invest", "province_id": 1, "gold": 500}]},
+                      {"offset": 2, "actions": [], "note": "继续"},
+                      {"offset": 3, "actions": []}]}
+    _fill_empty_turns(plan, {"tech_points": 0, "my_provinces": [7]})
+    assert plan["turns"][1]["actions"] == [{"action": "invest", "province_id": 1, "gold": 500}]
+    assert plan["turns"][1]["note"].endswith("[fill]延续")
+    assert plan["turns"][2]["actions"] == [{"action": "recruit_army", "province_id": 7, "count": 50}]
+    plan2 = {"turns": [{"offset": 1, "actions": []}]}
+    _fill_empty_turns(plan2, {"tech_points": 12, "my_provinces": [7]})
+    assert plan2["turns"][0]["actions"][0]["action"] == "invest_tech"
+
+
 def test_victory_progress_budget_sliders():
     from agent.state import victory_progress
     st = _sample_state()
