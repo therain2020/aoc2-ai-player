@@ -11,6 +11,8 @@ def format_state_line(st: dict) -> str:
     neigh = ", ".join(
         f"civ{n['civ_id']}(省{n.get('provinces','?')}/军{n.get('units','?')}/人{n.get('population','?')}"
         f"/金{n.get('money','?')}/技{n.get('tech','?')}/关{n.get('relation','?')}"
+        f"/外点{n.get('diplomacy_points','?')}/稳{n.get('stability','?')}"
+        f"/同化{len(n.get('assimilates') or [])}/战争分{n.get('war_score','?')}"
         f"/都{n.get('capital','?')}/边{n.get('border_provinces','?')}"
         f"{'(同盟)' if n.get('allied') else ''}{'(交战!)' if n.get('war') else ''})"
         for n in st.get("neighbors", [])) or "无邻国"
@@ -27,12 +29,16 @@ def format_state_line(st: dict) -> str:
     detail = ("我方省份: " + " ".join(detail_parts[:8])) if detail_parts else ""
     stab = st.get("stability") or {}
     stab_line = (f"稳定: 均满意{stab.get('hap_avg','?')} 最高革命风险{stab.get('rev_max','?')} "
+                 f"低稳省x{len(st.get('low_stability_list') or [])} "
                  f"核心省{stab.get('core','?')}/{stab.get('no_core','?')}非核心")
     treaties = st.get("treaties") or {}
     treaty_line = "条约: " + " ".join(f"civ{k}({v})" for k, v in treaties.items()) if treaties else ""
     wars = st.get("wars") or []
     war_line = ("战争: " + " ".join(f"w{agg_val}→{df_val}" for w in wars
                                     for agg_val, df_val in [(w.get('agg'), w.get('def'))])) if wars else ""
+    if war_line and st.get("war_score_res"):
+        ws = st["war_score_res"]
+        war_line += f"（分数 我{ws.get('mine', ws.get('agg', '?'))}/敌{ws.get('theirs', ws.get('def', '?'))}）"
     flank = st.get("front_lines") or []
     front_line = ("前线: " + " ".join(
         f"省{f.get('from')}→省{f.get('to')}(civ{f.get('civ')},我{f.get('my_units')}兵/敌{f.get('enemy_units')}兵)"
