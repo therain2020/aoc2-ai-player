@@ -34,7 +34,7 @@ def test_no_attack_then_mobilize_multiple():
     orders = plan_war_turn(st)
     assert all(o["action"] == "recruit_army" for o in orders)
     assert len(orders) == 2
-    assert orders[0]["province_id"] == 1 and orders[1]["province_id"] == 2
+    assert orders[0]["province_id"] == 10     # 动员目标=缺兵前线省（部署正道）
 
 
 def test_capital_priority():

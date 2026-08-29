@@ -226,7 +226,7 @@ def battle_view(st: dict) -> str:
     weak = []
     for f in st.get("front_lines") or []:
         frm = int(f.get("from"))
-        my_n = armies.get(frm, 0)
+        my_n = int(f.get("my_units")) if f.get("my_units") is not None else armies.get(frm, 0)
         if my_n < 50:
             weak.append(f"{frm}(我{my_n})")
     if weak:
