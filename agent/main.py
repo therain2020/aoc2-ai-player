@@ -495,12 +495,48 @@ def main():
                         bridge.end_turn()
                         time.sleep(4)
                         continue
-                war_actions = war_planner.plan_war_turn(st)
+                suggestion = war_planner.plan_war_turn(st)
+                sug_line = ("战术建议: " + "；".join(
+                    f"{a.get('action')}({'|'.join(str(v) for v in a.values() if v != a.get('action'))[:40]})"
+                    for a in suggestion)) if suggestion else \
+                    "战术建议: 无直接可攻目标（前线兵力劣势）——优先动员/集结，等待军力优势"
+                assessment = front_assessment(st.get("front_lines", []), stale, st)
+                history = build_history(session_dir)
+                ctx2 = build_turn_context(st, history)
+                strat2 = read_strategy(game_root)
+                if strat2:
+                    ctx2 = f"【用户战略指示】{strat2}\n" + ctx2
+                ctx2 = (f"{ledger_line(ledger)}\n{mech_prompts.budget_guard(ledger)}\n{phase_note}\n"
+                        + set_msg_lines(ctx_store, st)
+                        + victory_progress(st, session_dir) + "\n"
+                        + ctx2
+                        + "\n" + assessment
+                        + "\n" + sug_line
+                        + mech_prompts.war_turn_closing())
+                try:
+                    raw = chat_with_fallback(provider, WAR_SYSTEM_PROMPT, ctx2)
+                except LLMError as e:
+                    record_skip(cur, phase, ledger, f"war llm: {e}")
+                    time.sleep(2)
+                    continue
+                try:
+                    war_actions = parse_actions(raw)
+                except (ActionError, json.JSONDecodeError) as e:
+                    print(f"war decision invalid ({e}), retry once", flush=True)
+                    try:
+                        war_actions = parse_actions(chat_with_fallback(
+                            provider, WAR_SYSTEM_PROMPT, ctx2, "上次输出不合法，请严格按格式输出。"))
+                    except (ActionError, json.JSONDecodeError, LLMError) as e2:
+                        record_skip(cur, phase, ledger, f"war invalid x2: {e2}")
+                        time.sleep(2)
+                        continue
+                fail_streak = 0
                 if not war_actions:
-                    provs = st.get("my_provinces") or [0]
-                    war_actions = [{"action": "recruit_army", "province_id": int(provs[0]),
-                                    "count": 500}]
-                    print("  war planner empty -> mobilize", flush=True)
+                    # LLM 空决策 -> 战术建议订单保底（绝不罚站）
+                    war_actions = suggestion or [{"action": "recruit_army",
+                                                  "province_id": int((st.get("my_provinces") or [0])[0]),
+                                                  "count": 500}]
+                    print("  war empty decision -> suggestion orders", flush=True)
                 war_actions = value_normalizer.normalize_values(war_actions, st)
                 results = execute(bridge, war_actions)
                 war_trk.note_results(cur, results, prev_provinces, st.get("provinces", 0))
@@ -518,17 +554,6 @@ def main():
                     "brief": "战争规则订单(闪击战术)",
                     "tokens": dict(provider.last_usage), "tokens_cum": dict(provider.total),
                 })
-                # 每 5 回合 LLM 战略周报（只读摘要，指挥方向参考）
-                if cur - last_war_strategic >= 5:
-                    last_war_strategic = cur
-                    try:
-                        ctx = build_turn_context(st, build_history(session_dir))
-                        raw = provider.chat(WAR_SYSTEM_PROMPT,
-                                             ctx + "\n仅给出战略洞察（主攻方向/是否求和/兵力分配），短评，不输出动作：",
-                                             temperature=0.3, max_tokens=1200)
-                        print(f"  war strategy note: {raw[:130]}", flush=True)
-                    except Exception:
-                        pass
                 last_war_turn = cur
                 bridge.end_turn()
                 time.sleep(4)

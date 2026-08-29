@@ -61,7 +61,8 @@ def test_plan_spec_has_threat_and_opportunism_tactics():
 
 def test_budget_guard_low_gold_blocks_gold_actions():
     guard = prompts.budget_guard({"gold": -90, "income": {"gold": -3, "diplo": 8}})
-    assert "预算护栏" in guard and "禁止一切金币动作" in guard
+    # 信息提示语气（用户原则：给信息让 agent 权衡，不代为禁止）
+    assert "金库提示" in guard and "请自行权衡" in guard and "不禁止" in guard
     assert "invest" in guard
     g_rich = prompts.budget_guard({"gold": 5000, "income": {"gold": 120, "diplo": 3}})
     assert g_rich == ""

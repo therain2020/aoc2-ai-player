@@ -254,9 +254,37 @@ def _validate_actions(raw_actions: list) -> list:
     return actions
 
 
+#: 资源消耗与影响速查（引擎签名核实，docs/mechanics.md L1）——给 LLM 的"经济账"
+RESOURCE_ECONOMICS = """【资源消耗速查】（点=外交点；行动点=每回合 set 值；每动作依库内限制取舍）
+- declare_war: 无点扣，真实代价=侵略等级↑+全球关系-35+军费升
+- recruit_army: 行动点（每省一批扣一次 COST_OF_RECRUIT）+ 金/兵；批量越大越划算
+- move_army: 行动点（每支部队）；影响=移动+邻敌触发战斗
+- invest: 行动点≥12 + 金 → 省 4 回合经济收益（上限随省经济）
+- invest_dev: 行动点≥8 + 金 → 省发展
+- invest_tech: 科技点（8 类目，每回合点消耗）
+- disband_army: 行动点；move_capital: 金+50 回合冷却
+- offer_alliance: -20 点，-6/回合维护；关系上限 60-65
+- construct: 行动点(12-30)+金，工期 2-4 回合，每省每类 1 座
+- peace_treaty: 和约内容依胜利点自动分配（无点扣）
+- send_gift: -8 点 + 金(≤库25%) → 关系↑；send_insult: -2 点 → 关系-30+闭馆
+- trade_request: -10 点（金买贸易）；可携带"要求对方对 X 宣战/组反联盟"条款
+- nonaggression_pact: -8 点 -2/回；defensive/guarantee: -10 点
+- offer_vasalization: -16 点（接受→对方附庸缴税）
+- military_access_ask: ≥10 点-10；give: -4 点；40 回合
+- support_rebels: ≥34 点 + 金（敌省革命风险）; ultimatum: ≥24 点(关系≤-10)
+- civilize: ≥10 点+科技门槛; form_civilization: -24+1000金; proclaim_independence: -10
+- assimilate: ≥6 点+金(按省公式)；festival: ≥8 行动点+金(7回合+幸福)
+- colonize: 14 点+行动点+金（科技<0.8 惩罚×8.25）
+- buy_war: 金（我们的付出）+ 对方承诺对 X 宣战（对方接受即执行）
+- coalition_war: 金 + 双方同宣 X + NAP40 + 军事通行40
+- set_budget: 预算滑块（税0..1；商品/研究/投资% 四项总和引擎≤200% 削减）
+- guarantee_independence: -10 点；对方被宣→自动参战；union_proposal: -22 点（同盟后合并）
+"""
+
+
 def actions_prompt_spec() -> str:
     """Describe the action space for the LLM system prompt."""
-    return (
+    return RESOURCE_ECONOMICS + "\n" + (
         "输出 JSON {actions:[...], brief:\"...\"}。动作数量无人工上限，资源（行动点/金库/外交点/冷却）"
         "即硬上限；数量由局面自然决定——当下最重要的事若是大战役（多省动员、多路进攻）就完整列出该战役"
         "的全部动作，无事可做就给最少必要动作。**没有数量预置**，唯一标准：注意力在优先级最高的目标上，"
@@ -286,6 +314,9 @@ def actions_prompt_spec() -> str:
         "assimilate{province_id,num_of_turns} 同化敌对省(≥6外交点+钱,每省1单,10-50回合) |\n"
         "festival{province_id} 办节日提幸福(8行动点+钱) | colonize{province_id} 殖民荒芜省(≥14外交点+行动点+钱)\n"
         "动作资源成本: " + " ".join(f"{k}={v}" for k, v in COST_TAGS.items()) + "\n"
+        "动作数量无人工上限，资源（行动点/金库/外交点/冷却）即硬上限；数量由局面自然决定——"
+        "当下最重要的事若是大战役（多省动员、多路进攻）就完整列出该战役全部动作，无事可做就给最少必要动作。"
+        "没有数量预置，唯一标准：注意力在优先级最高的目标上，低优先级让位；禁止凑数也禁止遗漏紧急事项。\n"
         "规则：科技点尽量用完；保留≥1000金币储备；所有动作受【资源台账】预算约束"
         "（金/行动点/外交点存量+每回合收入）；brief=一句话中文战报。输出严格 JSON。"
     )
