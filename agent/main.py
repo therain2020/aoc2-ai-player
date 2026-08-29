@@ -463,9 +463,34 @@ def main():
                     except (TypeError, ValueError):
                         pass
                 enemy_units_now = sum(int(n.get("units") or 0) for n in st.get("neighbors", []) if n.get("war"))
+                # 胜利点满分收割（用户 2026-08-29：war_score 达 100 → 主动和谈获取领土）：
+                # PeaceTreaty_Data.AI_UseVictoryPoints 按胜利点自动分配割地（己占/邻接/core 评分×距离），
+                # 100 分=大收割——不必打到灭国即锁定战果
+                target_war = None
+                for n in st.get("neighbors", []):
+                    if n.get("war"):
+                        target_war = n.get("civ_id")
+                        break
+                if my_score_now >= 95 and target_war is not None:
+                    r = bridge.peace_treaty(target_war)
+                    print(f"  胜利点 {my_score_now}≥95 → 收割求和 peace_treaty(civ{target_war}): {str(r)[:70]}",
+                          flush=True)
+                    round_append(session_dir, {
+                        "turn": cur, "ts": time.time(), "type": "war",
+                        "mechanic_phase": phase.phase_id, "tactic_ref": phase.tactic_ref,
+                        "ledger": ledger,
+                        "decision": [{"action": "peace_treaty", "target_civ_id": target_war}],
+                        "results": [{"action": "peace_treaty", "result": r}],
+                        "brief": "胜利点满分→收割求和（自动分配领土）",
+                        "tokens": dict(provider.last_usage), "tokens_cum": dict(provider.total),
+                    })
+                    last_war_turn = cur
+                    bridge.end_turn()
+                    time.sleep(4)
+                    continue
                 if ("Message_WeCanSignPeace" in (st.get("msg_types") or "") or
                         "Message_PeaceTreaty" in (st.get("msg_types") or "")):
-                    if my_score_now >= 20 and not (my_score_now >= 70 and int(st.get("units") or 0) >= enemy_units_now * 2.5):
+                    if my_score_now >= 20 and my_score_now < 95:
                         tgt = None
                         for n in st.get("neighbors", []):
                             if n.get("war"):
