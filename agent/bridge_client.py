@@ -3,7 +3,8 @@ import time
 import urllib.parse
 import urllib.request
 
-DEFAULT_PORT = 9110
+# EngineGateway (source-level bridge, T014): port unified to 7187; legacy 9110 retired.
+DEFAULT_PORT = 7187
 
 
 class BridgeError(RuntimeError):
@@ -53,6 +54,50 @@ class BridgeClient:
 
     def end_turn(self) -> str:
         return self.action("endTurn")
+
+    def respond_messages(self) -> str:
+        return self.action("respondMessages")
+
+    def hud(self, line1: str = "", line2: str = "", line3: str = "",
+            line4: str = "", line5: str = "") -> str:
+        return self._get("/hud?l1=" + urllib.parse.quote(line1, safe="")
+                         + "&l2=" + urllib.parse.quote(line2, safe="")
+                         + "&l3=" + urllib.parse.quote(line3, safe="")
+                         + "&l4=" + urllib.parse.quote(line4, safe="")
+                         + "&l5=" + urllib.parse.quote(line5, safe=""))
+
+    def enter_god_view(self) -> str:
+        return self.action("enterGodView")
+
+    def load_game(self, index: int) -> str:
+        return self.action(f"loadGame|{index}")
+
+    def new_game(self) -> str:
+        return self.action("newGame")
+
+    def invest_tech(self, category: str, count: int = 1) -> str:
+        return self.action(f"investTech|{category}|{count}")
+
+    def disband_army(self, province_id: int, count: int) -> str:
+        return self.action(f"disbandArmy|{province_id}|{count}")
+
+    def move_capital(self, province_id: int) -> str:
+        return self.action(f"moveCapital|{province_id}")
+
+    def offer_alliance(self, target_civ_id: int) -> str:
+        return self.action(f"offerAlliance|{target_civ_id}")
+
+    def invest_dev(self, province_id: int, gold: int) -> str:
+        return self.action(f"investDev|{province_id}|{gold}")
+
+    def construct(self, building_type: str, province_id: int) -> str:
+        return self.action(f"construct|{building_type}|{province_id}")
+
+    def peace_treaty(self, target_civ_id: int) -> str:
+        return self.action(f"peaceTreaty|{target_civ_id}")
+
+    def push_plan(self, text: str) -> str:
+        return self._get("/plan?text=" + urllib.parse.quote(text, safe=""))
 
     def toast(self, text: str) -> str:
         return self.narration(text)
