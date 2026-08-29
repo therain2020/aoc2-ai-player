@@ -26,26 +26,39 @@ def read_pid():
         return None
 
 
+def bridge_ready() -> bool:
+    """T044: bridge readiness probe before Start (gateway.jar injected?)."""
+    try:
+        import urllib.request
+        with urllib.request.urlopen(BRIDGE + "/ping", timeout=1) as r:
+            return r.read().decode("utf-8").strip() == "pong"
+    except Exception:
+        return False
+
+
 def is_alive(pid=None) -> bool:
     pid = pid or read_pid()
     if not pid:
         return False
-    try:
-        import urllib.request
-        with urllib.request.urlopen(BRIDGE + "/ping", timeout=1):
-            pass
-    except Exception:
-        pass
     out = subprocess.run(["tasklist", "/fi", f"pid eq {pid}"],
                          capture_output=True, text=True, shell=True)
     return "python.exe" in out.stdout.lower()
 
 
 def start_agent():
-    pid = read_pid()
-    if pid and is_alive(pid):
-        print(f"  Agent already running (pid {pid})")
+    # T044: double-match (pid file + commandline) before starting
+    dup = _agent_pids()
+    if read_pid() and is_alive(read_pid()):
+        print(f"  Agent already running (pid {read_pid()})")
         return
+    if dup:
+        print(f"  stale agent process found via commandline ({dup}) - stop it first")
+        return
+    if not bridge_ready():
+        print("  bridge NOT ready (game not started / gateway.jar not injected)")
+        ans = input("  start agent anyway? (y/n) > ").strip().lower()
+        if ans not in ("y", "yes"):
+            return
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     log_f = open(LOG_FILE, "w", encoding="utf-8")
     env = dict(os.environ, PYTHONIOENCODING="utf-8")
@@ -69,6 +82,22 @@ def start_agent():
     print("  waiting for bridge... (start game & load a save first)")
 
 
+def _gateway_pids():
+    """Java/Javaw processes carrying the gateway javaagent (T044: stop together)."""
+    out = subprocess.run(
+        ["powershell", "-NoProfile", "-Command",
+         "Get-CimInstance Win32_Process -Filter \"name='java.exe' or name='javaw.exe'\" | "
+         "Where-Object { $_.CommandLine -match 'gateway.jar' } | "
+         "ForEach-Object { $_.ProcessId }"],
+        capture_output=True, text=True, shell=True)
+    pids = []
+    for line in out.stdout.splitlines():
+        line = line.strip()
+        if line.isdigit():
+            pids.append(int(line))
+    return pids
+
+
 def stop_agent():
     pid = read_pid()
     if not pid:
@@ -78,9 +107,13 @@ def stop_agent():
         subprocess.run(["taskkill", "/PID", str(p), "/F", "/T"],
                        capture_output=True, shell=True)
         cleaned += 1
+    for p in _gateway_pids():
+        subprocess.run(["taskkill", "/PID", str(p), "/F", "/T"],
+                       capture_output=True, shell=True)
+        cleaned += 1
     if PID_FILE.exists():
         PID_FILE.unlink()
-    print(f"  stopped {cleaned} agent process(es)")
+    print(f"  stopped {cleaned} process(es) (agent + gateway)")
 
 
 def _agent_pids():

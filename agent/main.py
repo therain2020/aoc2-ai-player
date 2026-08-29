@@ -173,6 +173,20 @@ class WarTracker:
         return flags
 
 
+#: transient views the engine auto-confirms / fast-forwards (FR-013);
+#: agent-side just waits briefly (T045 known-transition list).
+TRANSITION_PREFIXES = ("NextPlayerTurn", "TURN_ACTIONS", "LOAD_", "StartTheGame")
+
+
+def chat_with_fallback(provider, system: str, ctx: str, hint: str = "") -> str:
+    """One retry on LLMError (T043); raises LLMError if both attempts fail."""
+    try:
+        return provider.chat(system, ctx, temperature=0.3, max_tokens=8000)
+    except LLMError:
+        return provider.chat(system, ctx + "\n" + (hint or "上次系统调用返回错误，请重试。"),
+                             temperature=0.3, max_tokens=8000)
+
+
 def front_assessment(front_lines: list, stale: list[str]) -> str:
     """Front-line scoring + attack discipline (single-province >=10 to attack)."""
     if not isinstance(front_lines, list) or not front_lines:
@@ -232,11 +246,43 @@ def main():
     last_war_turn = -1
     war_trk = WarTracker()
     prev_provinces = 0
+    fail_streak = 0
+
+    def record_skip(cur, phase, ledger, reason) -> None:
+        """T043: LLM 失败/输出无效兜底——SKIP_TURN 确定性推进 + FAIL 标记；
+        连续 3 回合 FAIL → 写暂停文件并告警（dashboard 可读 turns.jsonl 的 fail_reason）。"""
+        nonlocal fail_streak
+        fail_streak += 1
+        print(f"SKIP_TURN (streak {fail_streak}): {reason}", flush=True)
+        round_append(session_dir, {
+            "turn": cur, "ts": time.time(), "type": "skip",
+            "mechanic_phase": phase.phase_id, "tactic_ref": phase.tactic_ref,
+            "ledger": ledger, "decision": [], "results": [],
+            "brief": "LLM 失败 → SKIP_TURN", "fail_reason": str(reason)[:120],
+            "tokens": dict(provider.last_usage), "tokens_cum": dict(provider.total),
+        })
+        if fail_streak >= 3:
+            (Path(game_root) / "aoc2_pause.txt").write_text(
+                "agent: 3 consecutive LLM failures", encoding="utf-8")
+            print("ALERT: 3 consecutive LLM failures -> paused (aoc2_pause.txt); "
+                  "resume by deleting the file", flush=True)
+        try:
+            _auto_invest_tech(bridge, st)
+        except Exception:
+            pass
+        bridge.end_turn()
+        time.sleep(4)
+
     try:
         while True:
             st = json.loads(bridge.state())
-            if st.get("turn_state") != "INPUT_ORDERS":
-                time.sleep(3)
+            ts = st.get("turn_state")
+            if st.get("game_end"):
+                time.sleep(10)
+                continue
+            if ts != "INPUT_ORDERS":
+                known = bool(ts) and any(str(ts).startswith(p) for p in TRANSITION_PREFIXES)
+                time.sleep(1.5 if known else 3.0)
                 continue
             cur = st.get("turn", 0)
             # gate: only act on a real game (in-game view, or a played turn exists —
@@ -293,19 +339,21 @@ def main():
                        + "\n" + assessment
                        + mech_prompts.war_turn_closing())
                 try:
-                    raw = provider.chat(WAR_SYSTEM_PROMPT, ctx, temperature=0.3, max_tokens=8000)
+                    raw = chat_with_fallback(provider, WAR_SYSTEM_PROMPT, ctx)
                 except LLMError as e:
-                    print(f"LLM call failed: {e}", flush=True)
-                    time.sleep(10)
+                    record_skip(cur, phase, ledger, f"war llm: {e}")
                     continue
                 try:
                     war_actions = parse_actions(raw)
                 except (ActionError, json.JSONDecodeError) as e:
                     print(f"war action invalid ({e}), retrying once", flush=True)
-                    raw = provider.chat(WAR_SYSTEM_PROMPT,
-                                        ctx + "\n上次输出不合法，请严格按格式输出。",
-                                        temperature=0.3, max_tokens=8000)
-                    war_actions = parse_actions(raw)
+                    try:
+                        war_actions = parse_actions(chat_with_fallback(
+                            provider, WAR_SYSTEM_PROMPT, ctx, "上次输出不合法，请严格按格式输出。"))
+                    except (ActionError, json.JSONDecodeError, LLMError) as e2:
+                        record_skip(cur, phase, ledger, f"war invalid x2: {e2}")
+                        continue
+                fail_streak = 0
                 results = execute(bridge, war_actions)
                 war_trk.note_results(cur, results, prev_provinces, st.get("provinces", 0))
                 prev_provinces = st.get("provinces", 0)
@@ -375,18 +423,21 @@ def main():
                        + ctx
                        + mech_prompts.plan_turn_closing(cur))
                 try:
-                    raw = provider.chat(SYSTEM_PROMPT, ctx, temperature=0.3, max_tokens=8000)
+                    raw = chat_with_fallback(provider, SYSTEM_PROMPT, ctx)
                 except LLMError as e:
-                    print(f"LLM call failed: {e}; retry in 10s", flush=True)
-                    time.sleep(10)
+                    record_skip(cur, phase, ledger, f"plan llm: {e}")
                     continue
                 try:
                     plan = parse_plan(raw)
                 except (ActionError, json.JSONDecodeError) as e:
                     print(f"plan invalid ({e}), retrying once", flush=True)
-                    raw = provider.chat(SYSTEM_PROMPT, ctx + "\n上次输出不合法，请严格按格式输出。",
-                                        temperature=0.3, max_tokens=8000)
-                    plan = parse_plan(raw)
+                    try:
+                        plan = parse_plan(chat_with_fallback(
+                            provider, SYSTEM_PROMPT, ctx, "上次输出不合法，请严格按格式输出。"))
+                    except (ActionError, json.JSONDecodeError, LLMError) as e2:
+                        record_skip(cur, phase, ledger, f"plan invalid x2: {e2}")
+                        continue
+                fail_streak = 0
                 plan["base_provinces"] = st.get("provinces", 0)
                 plan["start_turn"] = cur
                 planned_turn = cur + len(plan["turns"]) - 1
