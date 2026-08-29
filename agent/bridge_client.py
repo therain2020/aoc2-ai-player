@@ -166,6 +166,12 @@ class BridgeClient:
     def set_budget(self, tax_pct: int, goods_pct: int, research_pct: int, invest_pct: int) -> str:
         return self.action(f"setBudget|{tax_pct}|{goods_pct}|{research_pct}|{invest_pct}")
 
+    def guarantee_independence(self, target_civ_id: int) -> str:
+        return self.action(f"guaranteeIndependence|{target_civ_id}|100")
+
+    def union_proposal(self, target_civ_id: int) -> str:
+        return self.action(f"unionProposal|{target_civ_id}")
+
     def push_plan(self, text: str) -> str:
         return self._get("/plan?text=" + urllib.parse.quote(text, safe=""))
 

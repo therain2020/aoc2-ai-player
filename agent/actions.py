@@ -42,6 +42,9 @@ ACTION_SPEC = {
     # Budget 面板滑块（玩家等价操作，Menu_InGame_FlagAction_Budget）：
     # 税收/商品/研究/投资 各 0-100；引擎 clamp（税0..1）+支出总和<=200%削减
     "set_budget": {"tax_pct": int, "goods_pct": int, "research_pct": int, "invest_pct": int},
+    # 联盟链（2026-08-29 用户机制）：互保条约 / 联合统治提议（引擎 API 核实）
+    "guarantee_independence": {"target_civ_id": int},   # 保对方独立（被保方被宣战→我方自动参战）−10 点
+    "union_proposal": {"target_civ_id": int},           # 联合统治提议（CFG.createUnion；须同盟基础）−22 点
 }
 
 BUILDING_TYPES = ("fort", "farm", "library", "workshop", "armoury", "port", "supply")
@@ -99,6 +102,8 @@ COST_TAGS = {
     "buy_war": "multi",       # 金给目标 + 目标对 declare_war_on 宣战（引擎接受即执行）
     "coalition_war": "multi", # 金 + 双方同时对 coalition_against 宣战 + NAP40 + 通行40
     "set_budget": "query",    # 预算面板整形（无直接资源消耗；影响税收入/支出占比）
+    "guarantee_independence": "diplo",   # −10 点（保对方独立，自动参战绑定）
+    "union_proposal": "diplo",           # −22 点（联合统治合并，勿轻率：超级大国目标）
 }
 
 
@@ -272,6 +277,9 @@ def actions_prompt_spec() -> str:
         "call_to_arms{target_civ_id,against_civ_id} 号召盟友参战 |\n"
         "buy_war{target_civ_id,declare_war_on,gold} 花钱让 target 对 declare_war_on 宣战（挑拨贸易，引擎强制执行） |\n"
         "coalition_war{target_civ_id,coalition_against,gold} 花钱组成联合阵线：双方对 coalition_against 同时宣战+NAP40+通行40 |\n"
+        "guarantee_independence{target_civ_id} 保对方独立 100 回合（对方被宣战→我自动参战；互保=双向各一次） |\n"
+        "union_proposal{target_civ_id} 提议联合统治（-22点，同盟后合并=对方全部版图并入统治，扩张不费兵） |\n"
+        "military_access_ask{target_civ_id} 求军事通行（-10点）——战争中对盟/邻借路绕后夹击关键省份 |\n"
         "assimilate{province_id,num_of_turns} 同化敌对省(≥6外交点+钱,每省1单,10-50回合) |\n"
         "festival{province_id} 办节日提幸福(8行动点+钱) | colonize{province_id} 殖民荒芜省(≥14外交点+行动点+钱)\n"
         "动作资源成本: " + " ".join(f"{k}={v}" for k, v in COST_TAGS.items()) + "\n"

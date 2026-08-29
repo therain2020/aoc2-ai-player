@@ -62,7 +62,9 @@ final class EngineActions {
             // 交易挑拨 (TradeRequest_GameData 双清单：LEFT=我方给金, RIGHT=对方宣誓战/联盟)
             "buy_war", "coalition_war",
             // Budget 面板滑块（玩家等价操作；引擎 clamp，支出总和<=200%）
-            "set_budget"));
+            "set_budget",
+            // 联盟链：互保条约 / 联合统治提议
+            "guarantee_independence", "union_proposal"));
 
     static final class Result {
         final String result; // "OK" | "FAIL"
@@ -117,6 +119,8 @@ final class EngineActions {
         else if (n.equals("buyWar")) { n = "buy_war"; }
         else if (n.equals("coalitionWar")) { n = "coalition_war"; }
         else if (n.equals("setBudget")) { n = "set_budget"; }
+        else if (n.equals("guaranteeIndependence")) { n = "guarantee_independence"; }
+        else if (n.equals("unionProposal")) { n = "union_proposal"; }
         else if (n.equals("assimilate")) { n = "assimilate"; }
         else if (n.equals("festival")) { n = "festival"; }
         else if (n.equals("colonize")) { n = "colonize"; }
@@ -171,6 +175,10 @@ final class EngineActions {
                 return coalitionWar(ps);
             } else if (n.equals("set_budget")) {
                 return setBudget(ps);
+            } else if (n.equals("guarantee_independence")) {
+                return guaranteeIndependence(ps);
+            } else if (n.equals("union_proposal")) {
+                return unionProposal(ps);
             } else if (n.equals("improve_relations")) {
                 return improveRelations(ps);
             } else if (n.equals("decrease_relations")) {
@@ -661,6 +669,26 @@ final class EngineActions {
                         + "|invest=" + ((Number) EngineApi.call(civ, "getSpendings_Investments")).floatValue(),
                 detail("tax_pct", tax * 100, "goods_pct", goods * 100,
                         "research_pct", research * 100, "invest_pct", invest * 100));
+    }
+
+    /** guaranteeIndependence|target|turns — 保对方独立（-10 点；对方被宣战→我方自动参战 Game.java:9918）. */
+    private static Result guaranteeIndependence(Map<String, Object> ps) {
+        int target = intP(ps, "target_civ_id", "target", "civ_id", "civ");
+        int turns = ps.containsKey("turns") ? intP(ps, "turns") : 100;
+        int me = me();
+        EngineApi.call(EngineApi.cls(DIPLO), "sendGuaranteeIndependence_AskProposal",
+                target, me, Integer.valueOf(turns));
+        return ok("guarantee_independence", "OK|guaranteeIndependence|" + target + "|" + turns,
+                detail("target_civ_id", target, "turns", turns));
+    }
+
+    /** unionProposal|target — 提议联合统治（-22 点；同盟基础 + CFG.createUnion 合并版图）. */
+    private static Result unionProposal(Map<String, Object> ps) {
+        int target = intP(ps, "target_civ_id", "target", "civ_id", "civ");
+        int me = me();
+        EngineApi.call(EngineApi.cls(DIPLO), "sendUnionProposal", target, me);
+        return ok("union_proposal", "OK|unionProposal|" + target,
+                detail("target_civ_id", target));
     }
 
     /** coalitionWar|target|against|gold — 给金组联合阵线：双方对 against 宣战 + NAP40 + 军事通行40. */

@@ -69,15 +69,19 @@ GEAR_POLICY = {
         "pulse": "每一计划周期必须产出至少 1 场扩张动作;占省数停滞 2 计划→立即复盘转向",
     },
     5: {
-        "focus": "以盟友换扩张:先立盟,借盟军/call_to_arms 合力开战",
+        "focus": "联盟链（互保→通行→同盟→联合统治）：以不流血方式吞并强邻版图",
         "ops": ["offer_alliance", "send_gift", "improve_relations", "trade_request",
-                "military_access_give", "prepare_for_war", "call_to_arms", "declare_war"],
+                "military_access_give", "prepare_for_war", "call_to_arms", "declare_war",
+                "guarantee_independence", "union_proposal"],
         "diplo": ["offer_alliance", "send_gift", "improve_relations", "trade_request",
-                  "military_access_give", "nonaggression_pact"],
+                  "military_access_give", "nonaggression_pact", "guarantee_independence",
+                  "military_access_ask", "union_proposal"],
         "war": "先 call_to_arms/prepare_for_war 使其响应(盟友自动入战),再 declare_war 目标；"
                "借力挑拨：buy_war 让盟友打我们小敌/使强邻互斗；coalition_war 合兵围歼目标；无盟不打大仗",
         "taboo": "对盟友宣战;盟友邀请时不响应(call_to_arms 收到须 join_wars? 无动作→防守式响应)",
-        "pulse": "盟友数≥2 后,联合清剿共同小敌",
+        "pulse": "联盟链四阶：关系→互保(guarantee_independence 双向=互保条约) → 军事通行(military_access_ask/give 战争借道) "
+                 "→ 同盟(offer_alliance) → 联合统治(union_proposal,−22点) —— 超级大国合并=版图+人口翻倍不费兵；"
+                 "超级大国技巧：其宣战谁,我方就拉低与谁的关系(decrease_relations),蹭其恨意升关系→同盟→联合统治",
     },
     6: {
         "focus": "全面防御:要塞化+守军+边境稳定+关系止血",

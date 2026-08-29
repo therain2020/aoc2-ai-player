@@ -93,6 +93,35 @@ define(
 )
 
 define(
+    "ALLEGIANCE_CHAIN",
+    # 联盟链（用户机制 2026-08-29）：互保 → 军事通行 → 同盟 → 联合统治。
+    # 联合统治=sendUnionProposal(-22点)：对方接受后 CFG.createUnion 合并，两文明版图归一。
+    preconditions=lambda st: (
+        (int(st.get("diplomacy_points") or 0) >= 22, "diplo >= 22 and allied base"),
+        bool(st.get("allied_target")) if True else True),
+    steps=[("guarantee_independence", {"target_civ_id": "ctx_target"}),
+           ("military_access_ask", {"target_civ_id": "ctx_target"}),
+           ("offer_alliance", {"target_civ_id": "ctx_target"}),
+           ("union_proposal", {"target_civ_id": "ctx_target"})],
+    fallback="alliance chain step refused -> keep gifting/improve relations",
+    decide=lambda st, ctx: {"target": ctx.get("chain_target")} if ctx.get("chain_target") else None,
+)
+
+define(
+    "SUPERPOWER_ENTOURAGE",
+    # 超级大国跟随技巧（用户心得）：大国宣战 X -> 我们拉低与 X 关系（蹭大国仇视升关系）→ 同盟 → 联合统治。
+    preconditions=lambda st: (bool(st.get("big_neighbor") and st.get("big_neighbor_enemy")),
+                              "superpower & its enemy both known"),
+    steps=[("decrease_relations", {"target_civ_id": "ctx_enemy"}),
+           ("send_gift", {"target_civ_id": "ctx_big", "gold": 300}),
+           ("improve_relations", {"target_civ_id": "ctx_big"}),
+           ("union_proposal", {"target_civ_id": "ctx_big"})],
+    fallback="follow-the-leader step refused -> maintain distance, keep a second option",
+    decide=lambda st, ctx: ({"enemy": ctx.get("big_neighbor_enemy"),
+                             "big": ctx.get("big_neighbor")} if ctx.get("big_neighbor") else None),
+)
+
+define(
     "BUDGET_TUNE",
     # Budget 面板滑块（Menu_InGame_FlagAction_Budget，玩家等价）：
     # 税收档=幸福感修正（AI_Style:3498 模板）+ 支出四滑块 商品/研究/投资/军费 ≤200% 引擎削减。

@@ -40,6 +40,18 @@ def test_gear4_uses_trade_war_incitement_api():
     assert {"target_civ_id", "declare_war_on", "gold"} <= set(ACTION_SPEC["buy_war"])
 
 
+def test_alliance_chain_present_in_gear5_and_capabilities():
+    p = gears.GEAR_POLICY[5]
+    assert "guarantee_independence" in p["ops"] and "union_proposal" in p["ops"]  # 互保/联合统治
+    assert "联盟链" in p["focus"] and "超级大国技巧" in p["pulse"] or "超级大国" in p["pulse"]
+    from agent.actions import ACTION_SPEC
+    assert "guarantee_independence" in ACTION_SPEC and "union_proposal" in ACTION_SPEC
+    from agent.mechanics import capabilities
+    assert "ALLEGIANCE_CHAIN" in capabilities.capability_names()
+    assert "SUPERPOWER_ENTOURAGE" in capabilities.capability_names()
+    assert "guarantee_independence" in capabilities.get("ALLEGIANCE_CHAIN")["steps"][0][0]
+
+
 def test_plan_prompt_injects_gear_policy():
     sys = build_plan_system(4)
     assert "【当前档位执行要点】" in sys
