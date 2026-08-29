@@ -52,7 +52,8 @@ def test_guard_empty_front_and_never_empty_turn():
     st = {"turn": 1, "units": 3000, "move_points": 40, "my_provinces": [10, 20],
           "my_civ": 4,
           "armies_overview": [{"prov": 10, "army": 0}, {"prov": 20, "army": 2000}],
-          "adjacency": [{"mine": 20, "nbr": 10, "civ": 4}],
+          "adjacency": [{"mine": 20, "nbr": 10, "civ": 4},
+                        {"mine": 10, "nbr": 20, "civ": 4}],   # 引擎邻接双出
           "neighbors": [{"civ_id": 55, "war": True, "capital": 900, "units": 1500}],
           "front_lines": [{"from": 10, "to": 100, "civ": 55, "my_units": 0, "enemy_units": 300}]}
     orders = plan_war_turn(st)
