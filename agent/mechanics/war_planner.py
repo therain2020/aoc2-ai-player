@@ -49,9 +49,9 @@ def plan_war_turn(st: dict) -> list[dict]:
                            "to_province": int(o["to"]),
                            "count": max(int(omy * 0.8), MOVE_MIN)})
 
-    # ③ 动员：不限条数（超级大脑语义）——行动点宽松时多省多批
+    # ③ 动员：聚焦当前最重要（主力进攻优先；动员最多 2 批，不铺开失焦）
     if move_pts >= 8:
-        n_recruit = 3 if move_pts >= 24 else 1
+        n_recruit = 2 if move_pts >= 24 else 1
         for i in range(min(n_recruit, len(provs))):
             orders.append({"action": "recruit_army",
                            "province_id": int(provs[i]), "count": MOBILIZE})

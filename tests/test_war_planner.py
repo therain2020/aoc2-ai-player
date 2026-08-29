@@ -26,14 +26,14 @@ def test_blitz_moves_all_attackable_full_regiment():
     assert counts[10] >= 1600                     # 2000×0.8 全压
     assert counts[12] >= 3200                     # 4000×0.8 全压
     recruits = [o for o in orders if o["action"] == "recruit_army"]
-    assert len(recruits) == 3                     # 行动点30 → 三批动员
+    assert 1 <= len(recruits) <= 2                # 动员最多 2 批（聚焦，不铺开）
 
 
 def test_no_attack_then_mobilize_multiple():
     st = _st([{"from": 10, "to": 100, "civ": 55, "my_units": 5, "enemy_units": 200}], move_pts=30)
     orders = plan_war_turn(st)
     assert all(o["action"] == "recruit_army" for o in orders)
-    assert len(orders) == 3
+    assert len(orders) == 2
     assert orders[0]["province_id"] == 1 and orders[1]["province_id"] == 2
 
 
