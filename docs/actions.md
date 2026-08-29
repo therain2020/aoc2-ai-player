@@ -1,7 +1,7 @@
 # Agent 动作空间（权威速查表）
 
 > 同步源：`agent/actions.py :: ACTION_SPEC`。任何增删动作都必须同步此表
-> （宪法：文档-代码逐条一致）。当前动作总数：**11**。
+> （宪法：文档-代码逐条一致）。当前动作总数：**27**。
 
 ## 全部动作（AgentBridge `/action` 引擎直调）
 
@@ -18,6 +18,22 @@
 | `offer_alliance` | target_civ_id | `DiplomacyManager.sendAllianceProposal(target, me)` | 提议结盟；对方 AI 自行接受/拒绝 |
 | `construct` | building_type, province_id | `constructFort/...` 按类型 | 建造；完工周期约 **2-3 回合**未完工不可重复建，支持类型：fort/farm/library/workshop/armoury/port/supply |
 | `peace_treaty` | target_civ_id | `PeaceTreaty_Data(warID,…)` + `AI_UseVictoryPoints()` + `DiplomacyManager.sendPeaceTreaty(...)` | **向交战方求和（仅战争中使用）**：构造 AI 同款停战提议并发送，对方（内置 AI）自动接受/拒绝；无交战返回 `FAIL\|...\|no war` |
+| `send_gift` | target_civ_id, gold | `DiplomacyManager.sendGift(target, me, gold)` | 赠金；**−8 外交点**；金额引擎自动削至 ≤25% 金库；对方接受关系↑/拒绝↓ |
+| `send_insult` | target_civ_id | `DiplomacyManager.decreaseRelation(me, target, 5)` | 羞辱；**−2 外交点**；关系大幅 ↓（−26~−30 级）+ 双方闭馆 5 回合 |
+| `trade_request` | target_civ_id, gold | `TradeRequest_GameData` + `sendTradeRequest(target, me, data)` | 贸易请求（我方金买对方）；**−10 外交点**；对方 AI 自行接受/拒绝 |
+| `nonaggression_pact` | target_civ_id | `sendNonAggressionProposal(target, me, 40)` | 互不侵犯 40 回合；**−8 外交点**；−2/回合维护 |
+| `offer_vasalization` | target_civ_id | `sendOfferVasalizationProposal(target, me, 16)` | 附庸化请求；**−16 外交点**；接受→对方归属我方（缴税 VASSAL_TRIBUTE%） |
+| `military_access_ask` | target_civ_id | `sendMilitaryAccess_AskProposal(target, me, 40)` | 请求军事通行 40 回合；**外交点 ≥10，−10** |
+| `military_access_give` | target_civ_id | `sendMilitaryAccess_GiveProposal(target, me, 40)` | 授予军事通行 40 回合；**−4 外交点** |
+| `improve_relations` | target_civ_id | `DiplomacyManager.improveRelation(me, target)` | 改善关系；外交点 ≥5（未交战）；按国力/关系加减分 |
+| `decrease_relations` | target_civ_id | `DiplomacyManager.decreaseRelation(me, target, 5)` | 恶化关系；**−2 外交点**；关系 ↓ + 闭馆 |
+| `support_rebels` | target_civ_id, gold | `supportRebels(me, target, rebelCivID, gold)` | 扶植叛军；**外交点 ≥34，−34 + 金**；rebel_civ_id 缺省自动取候选首个 |
+| `ultimatum` | target_civ_id | `Ultimatum_GameData(demandAnexation)` + `sendUltimatum(target, me, data, units)` | 通牒吞并对方（须关系 ≤−10 且其为傀儡）；**−24 外交点**；接受→全境转我 |
+| `civilize` | target_civ_id | `DiplomacyManager.civilizeCiv(target)` | 开化部落文明；**−10 外交点** + 科技门槛；接受后该文明换意识形态/国旗 |
+| `form_civilization` | （无） | `CFG.formCiv(me)` | 把自己当前属性文明组建为可组建文明；**−24 外交点 + −1000 金**（canFormACiv 检查） |
+| `proclaim_independence` | target_civ_id | `sendGuaranteeIndependence_AskProposal(target, me, 40)` | 独立宣言请求；**−10 外交点**；接受→双方互不冲突/保障 |
+| `prepare_for_war` | target_civ_id, against_civ_id | `sendPrepareForWar(target, me, against, turns, me)` | 命盟友备战（AI 同款）：集结+征兵 3-6 回合 |
+| `call_to_arms` | target_civ_id, against_civ_id | `sendCallToArms(target, me, against)` | 号召盟友参战 |
 
 非动作运营命令：`endTurn`(`gameAction.tryToTakeNexTurn()`)、`respondMessages`(removeMessage 倒序)、
 `toast`(`CFG.toast.setInView`)、`hud`、`plan`(PageDown 内存通道)、`enterGodView`(`CFG.FOG_OF_WAR=0`)、

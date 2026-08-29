@@ -96,6 +96,56 @@ class BridgeClient:
     def peace_treaty(self, target_civ_id: int) -> str:
         return self.action(f"peaceTreaty|{target_civ_id}")
 
+    # ---- L1 外交全集 (engine-api.md) ----
+
+    def send_gift(self, target_civ_id: int, gold: int) -> str:
+        return self.action(f"sendGift|{target_civ_id}|{gold}")
+
+    def send_insult(self, target_civ_id: int) -> str:
+        return self.action(f"sendInsult|{target_civ_id}")
+
+    def trade_request(self, target_civ_id: int, gold: int) -> str:
+        return self.action(f"tradeRequest|{target_civ_id}|{gold}")
+
+    def nonaggression_pact(self, target_civ_id: int) -> str:
+        return self.action(f"nonAggressionPact|{target_civ_id}")
+
+    def offer_vasalization(self, target_civ_id: int) -> str:
+        return self.action(f"offerVasalization|{target_civ_id}")
+
+    def military_access_ask(self, target_civ_id: int) -> str:
+        return self.action(f"militaryAccessAsk|{target_civ_id}")
+
+    def military_access_give(self, target_civ_id: int) -> str:
+        return self.action(f"militaryAccessGive|{target_civ_id}")
+
+    def improve_relations(self, target_civ_id: int) -> str:
+        return self.action(f"improveRelations|{target_civ_id}")
+
+    def decrease_relations(self, target_civ_id: int) -> str:
+        return self.action(f"decreaseRelations|{target_civ_id}")
+
+    def support_rebels(self, target_civ_id: int, gold: int) -> str:
+        return self.action(f"supportRebels|{target_civ_id}|{gold}")
+
+    def ultimatum(self, target_civ_id: int) -> str:
+        return self.action(f"ultimatum|{target_civ_id}")
+
+    def civilize(self, target_civ_id: int) -> str:
+        return self.action(f"civilize|{target_civ_id}")
+
+    def form_civilization(self) -> str:
+        return self.action("formCivilization")
+
+    def proclaim_independence(self, target_civ_id: int) -> str:
+        return self.action(f"proclaimIndependence|{target_civ_id}")
+
+    def prepare_for_war(self, target_civ_id: int, against_civ_id: int, turns: int = 4) -> str:
+        return self.action(f"prepareForWar|{target_civ_id}|{against_civ_id}|{turns}")
+
+    def call_to_arms(self, target_civ_id: int, against_civ_id: int) -> str:
+        return self.action(f"callToArms|{target_civ_id}|{against_civ_id}")
+
     def push_plan(self, text: str) -> str:
         return self._get("/plan?text=" + urllib.parse.quote(text, safe=""))
 

@@ -15,6 +15,22 @@ ACTION_SPEC = {
     "offer_alliance": {"target_civ_id": int},
     "construct": {"building_type": str, "province_id": int},
     "peace_treaty": {"target_civ_id": int},
+    "send_gift": {"target_civ_id": int, "gold": int},
+    "send_insult": {"target_civ_id": int},
+    "trade_request": {"target_civ_id": int, "gold": int},
+    "nonaggression_pact": {"target_civ_id": int},
+    "offer_vasalization": {"target_civ_id": int},
+    "military_access_ask": {"target_civ_id": int},
+    "military_access_give": {"target_civ_id": int},
+    "improve_relations": {"target_civ_id": int},
+    "decrease_relations": {"target_civ_id": int},
+    "support_rebels": {"target_civ_id": int, "gold": int},
+    "ultimatum": {"target_civ_id": int},
+    "civilize": {"target_civ_id": int},
+    "form_civilization": {},
+    "proclaim_independence": {"target_civ_id": int},
+    "prepare_for_war": {"target_civ_id": int, "against_civ_id": int},
+    "call_to_arms": {"target_civ_id": int, "against_civ_id": int},
 }
 
 BUILDING_TYPES = ("fort", "farm", "library", "workshop", "armoury", "port", "supply")
@@ -44,6 +60,22 @@ COST_TAGS = {
     "offer_alliance": "diplo",
     "construct": "multi",     # 金币预付 + 行动点
     "peace_treaty": "diplo",
+    "send_gift": "multi",     # 8 外交点 + 金币（引擎削至 25% 金）
+    "send_insult": "diplo",   # 2 外交点（闭馆 5 回合，关系 −30 级）
+    "trade_request": "diplo", # 10 外交点
+    "nonaggression_pact": "diplo",    # 8 外交点/40 回合
+    "offer_vasalization": "diplo",    # 16 外交点
+    "military_access_ask": "diplo",   # 10 外交点
+    "military_access_give": "diplo",  # 4 外交点
+    "improve_relations": "diplo",     # 5+ 外交点门
+    "decrease_relations": "diplo",    # 2 外交点
+    "support_rebels": "multi",        # 34 外交点 + 金币
+    "ultimatum": "diplo",             # 24 外交点（关系 ≤−10）
+    "civilize": "diplo",              # 10 外交点 + 科技门槛
+    "form_civilization": "multi",     # 24 外交点 + 1000 金
+    "proclaim_independence": "diplo", # 10 外交点
+    "prepare_for_war": "move",        # 备战集结：兵力投入
+    "call_to_arms": "diplo",
 }
 
 
@@ -187,7 +219,15 @@ def actions_prompt_spec() -> str:
         "disband_army{province_id,count} 解散军队 | move_capital{province_id} 迁都 | "
         "offer_alliance{target_civ_id} 提议结盟 | construct{building_type,province_id} 建造,"
         "building_type∈fort/farm/library/workshop/armoury/port/supply | "
-        "peace_treaty{target_civ_id} 向交战方求和(仅战争中使用)\n"
+        "peace_treaty{target_civ_id} 向交战方求和(仅战争中使用) |\n"
+        "send_gift{target_civ_id,gold} 赠金(扣8外交点+金≤25%库) | send_insult{target_civ_id} 羞辱(扣2,关系大降慎用) |\n"
+        "trade_request{target_civ_id,gold} 金买贸易(扣10外交点) | nonaggression_pact{target_civ_id} 互不侵犯40回合(扣8) |\n"
+        "offer_vasalization{target_civ_id} 求对方附庸(扣16) | military_access_ask{target_civ_id}/military_access_give{target_civ_id} 军事通行40回合(扣10/4) |\n"
+        "improve_relations{target_civ_id} 改善关系(外交点≥5) | decrease_relations{target_civ_id} 恶化关系(扣2,闭馆5回合) |\n"
+        "support_rebels{target_civ_id,gold} 扶植叛军(扣34+金,搅乱敌省) | ultimatum{target_civ_id} 通牒吞并傀儡(关系≤−10且24外交点) |\n"
+        "civilize{target_civ_id} 开化(≥10外交点) | form_civilization 组建文明(24外交点+1000金) |\n"
+        "proclaim_independence{target_civ_id} 独立宣言(扣10) | prepare_for_war{target_civ_id,against_civ_id} 命盟友备战 |\n"
+        "call_to_arms{target_civ_id,against_civ_id} 号召盟友参战\n"
         "动作资源成本: " + " ".join(f"{k}={v}" for k, v in COST_TAGS.items()) + "\n"
         "规则：科技点尽量用完；保留≥1000金币储备；所有动作受【资源台账】预算约束"
         "（金/行动点/外交点存量+每回合收入）；brief=一句话中文战报。输出严格 JSON。"

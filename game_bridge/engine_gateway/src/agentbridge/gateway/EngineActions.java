@@ -40,13 +40,23 @@ final class EngineActions {
     private static final String START_THE_GAME_DATA = "age.of.civilizations2.jakowski.lukasz.Start_The_Game_Data";
     private static final String PEACE_TREATY_DATA = "age.of.civilizations2.jakowski.lukasz.PeaceTreaty_Data";
     private static final String MENU = "age.of.civilizations2.jakowski.lukasz.Menu";
+    private static final String TRADE_REQUEST = "age.of.civilizations2.jakowski.lukasz.TradeRequest_GameData";
+    private static final String TRADE_REQUEST_LIST = "age.of.civilizations2.jakowski.lukasz.TradeRequest_List";
+    private static final String ULTIMATUM = "age.of.civilizations2.jakowski.lukasz.Ultimatum_GameData";
+    private static final String SUPPORT_REBELS_DATA = "age.of.civilizations2.jakowski.lukasz.SupportRebels_Data";
 
     /** ACTION_SPEC names (agent/actions.py) plus bridge extras. */
     static final Set<String> ACTION_NAMES = new HashSet<String>(Arrays.asList(
             "declare_war", "recruit_army", "move_army", "invest", "invest_dev",
             "invest_tech", "disband_army", "move_capital", "offer_alliance",
             "construct", "peace_treaty", "new_game", "end_turn", "enter_god_view",
-            "respond_messages", "load_game", "list_saves", "toast", "state"));
+            "respond_messages", "load_game", "list_saves", "toast", "state",
+            // L1 外交全集 (T034, docs/mechanics.md L1)
+            "send_gift", "send_insult", "trade_request", "nonaggression_pact",
+            "offer_vasalization", "military_access_ask", "military_access_give",
+            "improve_relations", "decrease_relations", "support_rebels", "ultimatum",
+            "civilize", "form_civilization", "proclaim_independence",
+            "prepare_for_war", "call_to_arms"));
 
     static final class Result {
         final String result; // "OK" | "FAIL"
@@ -82,6 +92,25 @@ final class EngineActions {
         else if (n.equals("respondMessages")) { n = "respond_messages"; }
         else if (n.equals("loadGame")) { n = "load_game"; }
         else if (n.equals("listSaves")) { n = "list_saves"; }
+        else if (n.equals("sendGift")) { n = "send_gift"; }
+        else if (n.equals("sendInsult")) { n = "send_insult"; }
+        else if (n.equals("tradeRequest")) { n = "trade_request"; }
+        else if (n.equals("nonAggressionPact")) { n = "nonaggression_pact"; }
+        else if (n.equals("offerVasalization")) { n = "offer_vasalization"; }
+        else if (n.equals("militaryAccessAsk")) { n = "military_access_ask"; }
+        else if (n.equals("militaryAccessGive")) { n = "military_access_give"; }
+        else if (n.equals("improveRelations")) { n = "improve_relations"; }
+        else if (n.equals("decreaseRelations")) { n = "decrease_relations"; }
+        else if (n.equals("supportRebels")) { n = "support_rebels"; }
+        else if (n.equals("ultimatum")) { n = "ultimatum"; }
+        else if (n.equals("civilize")) { n = "civilize"; }
+        else if (n.equals("formCivilization")) { n = "form_civilization"; }
+        else if (n.equals("proclaimIndependence")) { n = "proclaim_independence"; }
+        else if (n.equals("prepareForWar")) { n = "prepare_for_war"; }
+        else if (n.equals("callToArms")) { n = "call_to_arms"; }
+        else if (n.equals("assimilate")) { n = "assimilate"; }
+        else if (n.equals("festival")) { n = "festival"; }
+        else if (n.equals("colonize")) { n = "colonize"; }
 
         if (!ACTION_NAMES.contains(n)) {
             return fail(name, "unknown action: " + name);
@@ -110,6 +139,38 @@ final class EngineActions {
                 return construct(ps);
             } else if (n.equals("peace_treaty")) {
                 return peaceTreaty(ps);
+            } else if (n.equals("send_gift")) {
+                return sendGift(ps);
+            } else if (n.equals("send_insult")) {
+                return sendInsult(ps);
+            } else if (n.equals("trade_request")) {
+                return tradeRequest(ps);
+            } else if (n.equals("nonaggression_pact")) {
+                return nonAggressionPact(ps);
+            } else if (n.equals("offer_vasalization")) {
+                return offerVasalization(ps);
+            } else if (n.equals("military_access_ask")) {
+                return militaryAccessAsk(ps);
+            } else if (n.equals("military_access_give")) {
+                return militaryAccessGive(ps);
+            } else if (n.equals("improve_relations")) {
+                return improveRelations(ps);
+            } else if (n.equals("decrease_relations")) {
+                return decreaseRelations(ps);
+            } else if (n.equals("support_rebels")) {
+                return supportRebels(ps);
+            } else if (n.equals("ultimatum")) {
+                return ultimatum(ps);
+            } else if (n.equals("civilize")) {
+                return civilize(ps);
+            } else if (n.equals("form_civilization")) {
+                return formCivilization(ps);
+            } else if (n.equals("proclaim_independence")) {
+                return proclaimIndependence(ps);
+            } else if (n.equals("prepare_for_war")) {
+                return prepareForWar(ps);
+            } else if (n.equals("call_to_arms")) {
+                return callToArms(ps);
             } else if (n.equals("new_game")) {
                 return newGame();
             } else if (n.equals("end_turn")) {
@@ -169,6 +230,50 @@ final class EngineActions {
                 ps.put("province_id", Integer.parseInt(p[2]));
             } else if (head.equals("peaceTreaty")) {
                 ps.put("target_civ_id", Integer.parseInt(p[1]));
+            } else if (head.equals("sendGift")) {
+                ps.put("target_civ_id", Integer.parseInt(p[1]));
+                ps.put("gold", p.length > 2 && p[2].length() > 0 ? Integer.parseInt(p[2]) : 0);
+            } else if (head.equals("sendInsult") || head.equals("decreaseRelations")) {
+                ps.put("target_civ_id", Integer.parseInt(p[1]));
+                if (p.length > 2 && p[2].length() > 0) {
+                    ps.put("turns", Integer.parseInt(p[2]));
+                }
+            } else if (head.equals("tradeRequest")) {
+                ps.put("target_civ_id", Integer.parseInt(p[1]));
+                ps.put("gold", p.length > 2 && p[2].length() > 0 ? Integer.parseInt(p[2]) : 0);
+            } else if (head.equals("nonAggressionPact")) {
+                ps.put("target_civ_id", Integer.parseInt(p[1]));
+            } else if (head.equals("offerVasalization")) {
+                ps.put("target_civ_id", Integer.parseInt(p[1]));
+            } else if (head.equals("militaryAccessAsk")) {
+                ps.put("target_civ_id", Integer.parseInt(p[1]));
+            } else if (head.equals("militaryAccessGive")) {
+                ps.put("target_civ_id", Integer.parseInt(p[1]));
+            } else if (head.equals("improveRelations")) {
+                ps.put("target_civ_id", Integer.parseInt(p[1]));
+            } else if (head.equals("supportRebels")) {
+                ps.put("target_civ_id", Integer.parseInt(p[1]));
+                ps.put("gold", Integer.parseInt(p[2]));
+                if (p.length > 3 && p[3].length() > 0) {
+                    ps.put("rebel_civ_id", Integer.parseInt(p[3]));
+                }
+            } else if (head.equals("ultimatum")) {
+                ps.put("target_civ_id", Integer.parseInt(p[1]));
+            } else if (head.equals("civilize")) {
+                ps.put("target_civ_id", Integer.parseInt(p[1]));
+            } else if (head.equals("formCivilization")) {
+                // self-directed (formCiv(me)); no pipe args
+            } else if (head.equals("proclaimIndependence")) {
+                ps.put("target_civ_id", Integer.parseInt(p[1]));
+            } else if (head.equals("prepareForWar")) {
+                ps.put("target_civ_id", Integer.parseInt(p[1]));
+                ps.put("against_civ_id", Integer.parseInt(p[2]));
+                if (p.length > 3 && p[3].length() > 0) {
+                    ps.put("turns", Integer.parseInt(p[3]));
+                }
+            } else if (head.equals("callToArms")) {
+                ps.put("target_civ_id", Integer.parseInt(p[1]));
+                ps.put("against_civ_id", Integer.parseInt(p[2]));
             } else if (head.equals("loadGame")) {
                 ps.put("save_index", Integer.parseInt(p[1]));
             } else if (head.equals("toast")) {
@@ -425,6 +530,191 @@ final class EngineActions {
         Object peaceGameData = EngineApi.get(peaceData, "peaceTreatyGameData");
         EngineApi.call(EngineApi.cls(DIPLO), "sendPeaceTreaty", Boolean.valueOf(meAggressor), me, peaceGameData);
         return ok("peace_treaty", "OK|peaceTreaty|" + target, detail("target", target, "war_id", nWarID));
+    }
+
+    // ---- L1 外交全集 (T034，docs/mechanics.md L1，成本由引擎方法内校验扣除) ----
+
+    /** sendGift|target|gold — DiplomacyManager.sendGift(引擎侧削至 25% 金、扣 8 外交点) */
+    private static Result sendGift(Map<String, Object> ps) {
+        int target = intP(ps, "target_civ_id", "target", "civ_id", "civ");
+        int gold = ps.containsKey("gold") ? intP(ps, "gold") : 0;
+        EngineApi.call(EngineApi.cls(DIPLO), "sendGift", target, me(), gold);
+        return ok("send_gift", "OK|sendGift|" + target + "|" + gold,
+                detail("target", target, "gold", gold));
+    }
+
+    /** sendInsult|target|turns — 关系羞辱（decreaseRelation：外交点≥2、扣 2、闭馆 turns 回合） */
+    private static Result sendInsult(Map<String, Object> ps) {
+        int target = intP(ps, "target_civ_id", "target", "civ_id", "civ");
+        int turns = ps.containsKey("turns") ? intP(ps, "turns") : 5;
+        boolean okFlag = ((Boolean) EngineApi.call(EngineApi.cls(DIPLO), "decreaseRelation",
+                me(), target, turns)).booleanValue();
+        if (okFlag) {
+            return ok("send_insult", "OK|sendInsult|" + target, detail("target", target, "turns", turns));
+        }
+        return fail("send_insult", "FAIL|sendInsult|" + target + "|外交点不足或非玩家");
+    }
+
+    /** tradeRequest|target|gold — SendTradeRequest_GameData(iCivLEFT=me, listLEFT.iGold=gold) → sendTradeRequest (扣 10 外交点) */
+    private static Result tradeRequest(Map<String, Object> ps) {
+        int target = intP(ps, "target_civ_id", "target", "civ_id", "civ");
+        int gold = ps.containsKey("gold") ? intP(ps, "gold") : 0;
+        int me = me();
+        Object data = EngineApi.newInst(EngineApi.cls(TRADE_REQUEST));
+        Object left = EngineApi.newInst(EngineApi.cls(TRADE_REQUEST_LIST));
+        EngineApi.set(left, "iGold", gold);
+        EngineApi.set(data, "iCivLEFT", me);
+        EngineApi.set(data, "iCivRIGHT", target);
+        EngineApi.set(data, "listLEFT", left);
+        boolean okFlag = ((Boolean) EngineApi.call(EngineApi.cls(DIPLO), "sendTradeRequest",
+                target, me, data)).booleanValue();
+        if (okFlag) {
+            return ok("trade_request", "OK|tradeRequest|" + target + "|" + gold,
+                    detail("target", target, "gold", gold));
+        }
+        return fail("trade_request", "FAIL|tradeRequest|" + target + "|外交点不足(需≥10)");
+    }
+
+    /** nonAggressionPact|target — 互不侵犯 40 回合（扣 8 外交点） */
+    private static Result nonAggressionPact(Map<String, Object> ps) {
+        int target = intP(ps, "target_civ_id", "target", "civ_id", "civ");
+        EngineApi.call(EngineApi.cls(DIPLO), "sendNonAggressionProposal", target, me(), Integer.valueOf(40));
+        return ok("nonaggression_pact", "OK|nonAggressionPact|" + target, detail("target", target, "turns", 40));
+    }
+
+    /** offerVasalization|target — 附庸化请求（扣 16 外交点） */
+    private static Result offerVasalization(Map<String, Object> ps) {
+        int target = intP(ps, "target_civ_id", "target", "civ_id", "civ");
+        EngineApi.call(EngineApi.cls(DIPLO), "sendOfferVasalizationProposal", target, me(), Integer.valueOf(16));
+        return ok("offer_vasalization", "OK|offerVasalization|" + target, detail("target", target));
+    }
+
+    /** militaryAccessAsk|target — 请求军事通行 40 回合（外交点≥10、扣 10） */
+    private static Result militaryAccessAsk(Map<String, Object> ps) {
+        int target = intP(ps, "target_civ_id", "target", "civ_id", "civ");
+        EngineApi.call(EngineApi.cls(DIPLO), "sendMilitaryAccess_AskProposal", target, me(), Integer.valueOf(40));
+        return ok("military_access_ask", "OK|militaryAccessAsk|" + target, detail("target", target, "turns", 40));
+    }
+
+    /** militaryAccessGive|target — 授予军事通行 40 回合（扣 4 外交点） */
+    private static Result militaryAccessGive(Map<String, Object> ps) {
+        int target = intP(ps, "target_civ_id", "target", "civ_id", "civ");
+        EngineApi.call(EngineApi.cls(DIPLO), "sendMilitaryAccess_GiveProposal", target, me(), Integer.valueOf(40));
+        return ok("military_access_give", "OK|militaryAccessGive|" + target, detail("target", target, "turns", 40));
+    }
+
+    /** improveRelations|target — 关系升级（improveRelation：外交点≥5 且未交战） */
+    private static Result improveRelations(Map<String, Object> ps) {
+        int target = intP(ps, "target_civ_id", "target", "civ_id", "civ");
+        boolean okFlag = ((Boolean) EngineApi.call(EngineApi.cls(DIPLO), "improveRelation",
+                me(), target)).booleanValue();
+        if (okFlag) {
+            return ok("improve_relations", "OK|improveRelations|" + target, detail("target", target));
+        }
+        return fail("improve_relations", "FAIL|improveRelations|" + target + "|外交点<5 或交战/使馆关闭");
+    }
+
+    /** decreaseRelations|target|turns — 关系恶化（外交点≥2、扣 2、闭馆 turns 回合） */
+    private static Result decreaseRelations(Map<String, Object> ps) {
+        int target = intP(ps, "target_civ_id", "target", "civ_id", "civ");
+        int turns = ps.containsKey("turns") ? intP(ps, "turns") : 5;
+        boolean okFlag = ((Boolean) EngineApi.call(EngineApi.cls(DIPLO), "decreaseRelation",
+                me(), target, turns)).booleanValue();
+        if (okFlag) {
+            return ok("decrease_relations", "OK|decreaseRelations|" + target, detail("target", target, "turns", turns));
+        }
+        return fail("decrease_relations", "FAIL|decreaseRelations|" + target + "|外交点不足");
+    }
+
+    /** supportRebels|target|gold|rebel_civ_id? — 支持叛军（外交点≥34、扣 34；rebel 缺省取首个候选） */
+    private static Result supportRebels(Map<String, Object> ps) {
+        int target = intP(ps, "target_civ_id", "target", "civ_id", "civ");
+        int gold = intP(ps, "gold");
+        int me = me();
+        int rebel = -1;
+        if (ps.containsKey("rebel_civ_id")) {
+            rebel = intP(ps, "rebel_civ_id");
+        } else {
+            try {
+                Object data = EngineApi.call(EngineApi.cls(DIPLO), "supportRebels", target);
+                Object movements = EngineApi.get(data, "lMovements");
+                if (movements instanceof List && !((List<?>) movements).isEmpty()) {
+                    rebel = ((Number) ((List<?>) movements).get(0)).intValue();
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        if (rebel <= 0) {
+            return fail("support_rebels", "FAIL|supportRebels|" + target + "|no rebel civ");
+        }
+        boolean okFlag = ((Boolean) EngineApi.call(EngineApi.cls(DIPLO), "supportRebels",
+                me, target, rebel, gold)).booleanValue();
+        if (okFlag) {
+            return ok("support_rebels", "OK|supportRebels|" + target + "|" + rebel,
+                    detail("target", target, "rebel_civ_id", rebel, "gold", gold));
+        }
+        return fail("support_rebels", "FAIL|supportRebels|" + target + "|外交点<34 或无金");
+    }
+
+    /** ultimatum|target — 通牒吞并（关系≤−10 且对方为傀儡：外交点≥24、扣 24） */
+    private static Result ultimatum(Map<String, Object> ps) {
+        int target = intP(ps, "target_civ_id", "target", "civ_id", "civ");
+        int me = me();
+        Object data = EngineApi.newInst(EngineApi.cls(ULTIMATUM));
+        EngineApi.set(data, "demandAnexation", Boolean.TRUE);
+        int units = ((Integer) EngineApi.call(civ(me), "getNumOfUnits")).intValue();
+        boolean okFlag = ((Boolean) EngineApi.call(EngineApi.cls(DIPLO), "sendUltimatum",
+                target, me, data, units)).booleanValue();
+        if (okFlag) {
+            return ok("ultimatum", "OK|ultimatum|" + target, detail("target", target, "units", units));
+        }
+        return fail("ultimatum", "FAIL|ultimatum|" + target + "|关系需≤−10 且外交点≥24");
+    }
+
+    /** civilize|target — 开化目标文明（外交点≥10、科技达标；扣 10） */
+    private static Result civilize(Map<String, Object> ps) {
+        int target = intP(ps, "target_civ_id", "target", "civ_id", "civ");
+        boolean okFlag = ((Boolean) EngineApi.call(EngineApi.cls(DIPLO), "civilizeCiv", target)).booleanValue();
+        if (okFlag) {
+            return ok("civilize", "OK|civilize|" + target, detail("target", target));
+        }
+        return fail("civilize", "FAIL|civilize|" + target + "|外交点<10 或不满足开化条件");
+    }
+
+    /** formCivilization — 组建可用文明（CFG.formCiv(me)；扣 1000 金 + 24 外交点） */
+    private static Result formCivilization(Map<String, Object> ps) {
+        EngineApi.call(EngineApi.cls(CFG), "formCiv", me());
+        return ok("form_civilization", "OK|formCiv", null);
+    }
+
+    /** proclaimIndependence|target|turns — 独立宣言（保障请求：扣 10 外交点，默认 40 回合） */
+    private static Result proclaimIndependence(Map<String, Object> ps) {
+        int target = intP(ps, "target_civ_id", "target", "civ_id", "civ");
+        int turns = ps.containsKey("turns") ? intP(ps, "turns") : 40;
+        EngineApi.call(EngineApi.cls(DIPLO), "sendGuaranteeIndependence_AskProposal",
+                target, me(), turns);
+        return ok("proclaim_independence", "OK|proclaimIndependence|" + target,
+                detail("target", target, "turns", turns));
+    }
+
+    /** prepareForWar|target|against|turns — 通知盟友备战（AI 同款 sendPrepareForWar） */
+    private static Result prepareForWar(Map<String, Object> ps) {
+        int target = intP(ps, "target_civ_id", "target", "civ_id", "civ");
+        int against = intP(ps, "against_civ_id", "against");
+        int turns = ps.containsKey("turns") ? intP(ps, "turns") : 4;
+        int me = me();
+        EngineApi.call(EngineApi.cls(DIPLO), "sendPrepareForWar", target, me, against, turns, me);
+        return ok("prepare_for_war", "OK|prepareForWar|" + target + "|against|" + against,
+                detail("target", target, "against_civ_id", against, "turns", turns));
+    }
+
+    /** callToArms|target|against — 号召盟友参战（sendCallToArms） */
+    private static Result callToArms(Map<String, Object> ps) {
+        int target = intP(ps, "target_civ_id", "target", "civ_id", "civ");
+        int against = intP(ps, "against_civ_id", "against");
+        EngineApi.call(EngineApi.cls(DIPLO), "sendCallToArms", target, me(), against);
+        return ok("call_to_arms", "OK|callToArms|" + target + "|against|" + against,
+                detail("target", target, "against_civ_id", against));
     }
 
     /** newGame — legacy AgentBridge "newGame" case (idempotency guard ported) */
