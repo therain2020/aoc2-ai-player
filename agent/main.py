@@ -532,17 +532,28 @@ def main():
                         continue
                 fail_streak = 0
                 if not war_actions:
-                    # LLM 空决策 -> 战术建议订单保底（绝不罚站）
+                    # LLM 空决策（违反硬约束）→ 强制重试一次（警告），仍空才用建议保底
+                    try:
+                        raw2 = chat_with_fallback(
+                            provider, WAR_SYSTEM_PROMPT, ctx2,
+                            "上次输出为空数组，违规——必须给出至少 1 个动作（最小动作：集结/征兵/前线移动）。")
+                        war_actions = parse_actions(raw2)
+                        print("  war empty -> forced retry ok", flush=True)
+                    except (ActionError, json.JSONDecodeError, LLMError):
+                        war_actions = []
+                        print("  war empty -> suggestion orders (last resort)", flush=True)
+                from_source = "llm"
+                if not war_actions:
+                    from_source = "suggestion"
                     war_actions = suggestion or [{"action": "recruit_army",
                                                   "province_id": int((st.get("my_provinces") or [0])[0]),
                                                   "count": 500}]
-                    print("  war empty decision -> suggestion orders", flush=True)
                 war_actions = value_normalizer.normalize_values(war_actions, st)
                 results = execute(bridge, war_actions)
                 war_trk.note_results(cur, results, prev_provinces, st.get("provinces", 0))
                 prev_provinces = st.get("provinces", 0)
                 ok_n = sum(1 for r in results if result_ok(r["result"]))
-                print(f"  war orders {ok_n}/{len(results)} ok: "
+                print(f"  war actions {ok_n}/{len(results)} ok ({from_source}): "
                       f"{[r['action'] for r in results]}", flush=True)
                 bridge.toast(f"[战争回合{cur}] 执行 {ok_n}/{len(results)}")
                 round_append(session_dir, {
@@ -551,7 +562,7 @@ def main():
                     "mechanic_phase": phase.phase_id, "tactic_ref": phase.tactic_ref,
                     "ledger": ledger,
                     "decision": war_actions, "results": results,
-                    "brief": "战争规则订单(闪击战术)",
+                    "brief": f"战争决策({from_source})",
                     "tokens": dict(provider.last_usage), "tokens_cum": dict(provider.total),
                 })
                 last_war_turn = cur
