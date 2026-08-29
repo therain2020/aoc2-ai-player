@@ -279,7 +279,12 @@ def main():
 
     try:
         while True:
-            st = json.loads(bridge.state())
+            try:
+                st = json.loads(bridge.state())
+            except (json.JSONDecodeError, BridgeError):
+                # bridge hiccup / transient malformed payload: back off, do not crash
+                time.sleep(5)
+                continue
             ts = st.get("turn_state")
             ge = st.get("game_end")
             ended = ge is True or (isinstance(ge, dict) and ge.get("ended") is True)
