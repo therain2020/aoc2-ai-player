@@ -194,6 +194,7 @@ PAGE = """<!DOCTYPE html>
 <div>
   <span style="color:#7c8698;font-size:12px">战略档：</span>
   <span id="gears"></span>
+  <div id="gearNow" class="sub"></div>
   <button id="btnPause" class="dim" style="float:right;background:#243044;color:#b8c7dd;border:1px solid #34435c">暂停 Agent</button>
 </div>
 <div class="grid" id="stats"></div>
@@ -211,6 +212,7 @@ PAGE = """<!DOCTYPE html>
   </div>
 </div>
 <script>
+const GEARS = /*__GEARS__*/[];
 let state = null, planHtml = "", rendered = new Set(), flow = [];
 
 function req(method, path, body) {
@@ -278,8 +280,10 @@ function renderGears() {
   const idx = ['①','②','③','④','⑤','⑥'].findIndex(s => cur.startsWith(s));
   wrap.innerHTML = Array.from({length:6}, (_, i) => {
     const on = idx === i;
-    return `<button class="gearbtn${on?' on':''}" data-g="${i+1}">${i+1}档</button>`;
+    const short = GEARS[i].replace(/^[①②③④⑤⑥]\s*/, '').split('：')[0].slice(0, 6);
+    return `<button class="gearbtn${on?' on':''}" data-g="${i+1}" title="${GEARS[i]}">${i+1}·${short}</button>`;
   }).join('');
+  el('gearNow').textContent = idx >= 0 ? ('当前战略：' + GEARS[idx]) : '当前战略：（未设档）';
   wrap.querySelectorAll('.gearbtn').forEach(b => b.onclick = async () => {
     await req('POST', '/api/command', {cmd:'gear', value: parseInt(b.dataset.g)});
     flash('战略档已写入'); setTimeout(poll, 1200);
@@ -387,6 +391,10 @@ el('strategy').addEventListener('keydown', e => { if ((e.ctrlKey||e.metaKey) && 
 setInterval(poll, 2000);
 poll();
 </script></body></html>"""
+
+
+# 注入六档文案到前端（PAGE 内 const GEARS = /*__GEARS__*/[]；JSON 转义防注入）
+PAGE = PAGE.replace("/*__GEARS__*/", json.dumps(GEARS, ensure_ascii=False))
 
 
 class Handler(BaseHTTPRequestHandler):
