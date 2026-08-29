@@ -8,7 +8,7 @@ from agent.mechanics.sanitize import sanitize_actions
 
 
 def _st():
-    return {"front_lines": [{"from": 10, "to": 100, "civ": 55, "my_units": 2000, "enemy_units": 300}]}
+    return {"money": 5000, "front_lines": [{"from": 10, "to": 100, "civ": 55, "my_units": 2000, "enemy_units": 300}]}
 
 
 def test_drops_non_front_moves():
