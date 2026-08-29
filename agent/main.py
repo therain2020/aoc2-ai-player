@@ -419,10 +419,14 @@ def main():
                 if st.get("messages", 0) > 0:
                     kind = handle_messages(bridge, ctx_store, st)
                     if kind == "decision":
+                        ctx_store.add_event("cadence_msg", st.get("msg_types", "")[:80])
+                        time.sleep(1)
+                        # 不阻断：落入 war 决策流（每回合 FR-009）
+                    else:
                         time.sleep(1)
                         continue
                 if last_war_turn == cur:
-                    time.sleep(5)
+                    time.sleep(3)
                     continue
                 print(f"WAR TURN {cur}: tactical orders (rule-driven blitz)", flush=True)
                 war_trk.on_turn(cur)
@@ -532,9 +536,12 @@ def main():
             if st.get("messages", 0) > 0:
                 kind = handle_messages(bridge, ctx_store, st)
                 if kind == "decision":
+                    # 决策类消息：不 continue 阻断——落 cadence 决策流（dmsg 触发一次）
                     ctx_store.add_event("cadence_msg", st.get("msg_types", "")[:80])
-                time.sleep(1)
-                continue
+                    time.sleep(1)
+                else:
+                    time.sleep(1)
+                    continue
 
             # strategy signature (cadence trigger when user changes strategy)
             strat = read_strategy(game_root)
