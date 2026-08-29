@@ -90,15 +90,17 @@ def build_turn_context(state: dict, history: str) -> str:
     return f"{l_line}\n{st_line}\n{provs_ctx}\n历史:\n{history}"
 
 
-RISK_RATIO = 1.2
+RISK_RATIO = 1.2          # 提示阈值（ctx 警告，不打断计划）
+FORCE_RATIO = 1.5         # 强制重规划阈值（性命攸关才打断，防 LLM 烧循环）
 
 
-def threat_scan(st: dict) -> dict | None:
+def threat_scan(st: dict, force_only: bool = True) -> dict | None:
     """War-risk scan (2026-08-29 user feedback: agent got wiped out).
 
     A hostile (negative relation or already warring) neighbor whose army
-    exceeds ours by RISK_RATIO is a pre-emptive window: act (declare war /
-    stabilize relations), never turtle.
+    exceeds ours by RISK_RATIO is a pre-emptive window. force_only=True
+    returns only the life-threatening tier (>= FORCE_RATIO) for re-planning;
+    others surface as ctx hints via victory_progress/danger_note only.
     """
     try:
         me = int(st.get("units") or 0)
@@ -113,7 +115,8 @@ def threat_scan(st: dict) -> dict | None:
             continue
         rel = n.get("relation") or 0
         hostile = bool(n.get("war")) or (isinstance(rel, (int, float)) and rel < 0)
-        if un >= me * RISK_RATIO and hostile:
+        th = FORCE_RATIO if force_only else RISK_RATIO
+        if un >= me * th and hostile:
             return {"civ_id": n.get("civ_id"), "units": un, "mine": me,
                     "ratio": round(un / me, 2), "war": bool(n.get("war"))}
     return None
