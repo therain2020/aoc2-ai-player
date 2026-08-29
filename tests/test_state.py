@@ -180,7 +180,7 @@ def test_battle_view_agent_graph():
                        {"mine": 242, "nbr": 301, "civ": 55}]
     st["front_lines"] = [{"from": 241, "to": 300, "civ": 55, "my_units": 10, "enemy_units": 80}]
     view = battle_view(st)
-    for token in ("【战场图】", "241(300)", "可调动", "可进攻", "告急走廊241"):
+    for token in ("【战场图】", "241(300)", "可调动", "可进攻", "告急走廊", "241(我10)"):
         assert token in view, token
 
 

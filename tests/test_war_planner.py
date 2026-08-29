@@ -33,7 +33,7 @@ def test_no_attack_then_mobilize_multiple():
     st = _st([{"from": 10, "to": 100, "civ": 55, "my_units": 5, "enemy_units": 200}], move_pts=30)
     orders = plan_war_turn(st)
     assert all(o["action"] == "recruit_army" for o in orders)
-    assert len(orders) == 2
+    assert len(orders) == 1                   # 1 个缺兵前方省 → 1 批（上限 2）
     assert orders[0]["province_id"] == 10     # 动员目标=缺兵前线省（部署正道）
 
 
