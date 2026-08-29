@@ -379,6 +379,19 @@ def main():
             "tokens": dict(provider.last_usage), "tokens_cum": dict(provider.total),
         })
         if fail_streak >= 3:
+            at_war_now = bool(st.get("wars")) or any(n.get("war") for n in st.get("neighbors", []))
+            if at_war_now:
+                # 战争期绝不静默停摆（用户批评"罚站"）——降级为应急募兵继续作战节拍
+                print("ALERT: 3x LLM failures DURING WAR -> emergency mobilization "
+                      "(no pause)", flush=True)
+                try:
+                    provs = st.get("my_provinces") or [0]
+                    bridge.recruit_army(int(provs[0]), 500)
+                    bridge.end_turn()
+                except Exception:
+                    pass
+                fail_streak = 0
+                return
             import datetime
             (Path(game_root) / "aoc2_pause.txt").write_text(
                 "#auto:3x-llm-failures " + datetime.datetime.now().isoformat(timespec="seconds")
