@@ -353,8 +353,14 @@ final class EngineState {
                                         EngineApi.call(game(), "getProvince", ep), "getArmy", ec);
                             } catch (Throwable ignoredArmy) {
                             }
-                            if (myArmy == null || enemyArmy == null) {
-                                continue;
+                            // 2026-08-29: army getter may fail for occupied/war zones —
+                            // emit 0 instead of dropping the whole front entry
+                            // (dropping emptied front_lines and starved the war loop).
+                            if (myArmy == null) {
+                                myArmy = Integer.valueOf(0);
+                            }
+                            if (enemyArmy == null) {
+                                enemyArmy = Integer.valueOf(0);
                             }
                             StringBuilder item = new StringBuilder();
                             item.append("{\"from\":").append(pid)

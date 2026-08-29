@@ -279,10 +279,15 @@ def chat_with_fallback(provider, system: str, ctx: str, hint: str = "") -> str:
                              temperature=0.3, max_tokens=8000)
 
 
-def front_assessment(front_lines: list, stale: list[str]) -> str:
-    """Front-line scoring + attack discipline (single-province >=10 to attack)."""
+def front_assessment(front_lines: list, stale: list[str], st: dict | None = None) -> str:
+    """Front-line scoring + attack discipline; falls back to a war overview
+    when the bridge front_lines are empty (targets: enemy capital/provinces)."""
     if not isinstance(front_lines, list) or not front_lines:
-        return "前线评估: 暂无前线信息（敌军远守或未接壤）——按征兵集结处理。"
+        overview = _war_overview(st)
+        disc = ("\n攻击纪律: 单省我方兵力≥10 且 > 敌省时才进攻；劣势只集结/征兵/防守。"
+                "\n（如前线明细缺失：先按敌首都方向推进，move_army 选择与我国边境省相邻的敌省。）")
+        stal = ("\n⚠ 僵局信号: " + "；".join(stale) + "\n建议启用 peace_treaty 止损。") if stale else ""
+        return overview + disc + stal
     lines = []
     for f in front_lines[:8]:
         my = int(f.get("my_units") or 0)
@@ -298,6 +303,22 @@ def front_assessment(front_lines: list, stale: list[str]) -> str:
     disc = "\n攻击纪律: 单省我方兵力≥10 且 > 敌省时才进攻；劣势只集结/征兵/防守。"
     stal = ("\n⚠ 僵局信号: " + "；".join(stale) + "\n建议启用 peace_treaty 止损（向交战方求和，等待对方接受）。") if stale else ""
     return head + disc + stal
+
+
+def _war_overview(st: dict | None) -> str:
+    parts = []
+    for w in st.get("wars", []) or [] if st else []:
+        parts.append(f"战争 civ{w.get('agg')}→civ{w.get('def')} 分数 我{w.get('my_score')}/敌{w.get('their_score')}")
+    my_u = int(st.get("units") or 0) if st else 0
+    for n in st.get("neighbors", []) or [] if st else []:
+        if not n.get("war"):
+            continue
+        parts.append(f"效敌civ{n.get('civ_id')}: {n.get('provinces')}省/军{n.get('units')}/"
+                     f"首都{n.get('capital')}/接壤{n.get('border_provinces')}处"
+                     f"（我{my_u}兵 vs 敌{n.get('units')}兵）")
+    return (("战争概况:\n" + "\n".join(parts) +
+             "\n我方总兵力通常碾压时：推进敌军薄弱边境省/奔袭其首都；敌首都是战略目标（move_army 邻接推理）。")
+            if parts else "战争概况: 数据缺失——先按动员集结处理。")
 
 
 def main():
@@ -436,7 +457,7 @@ def main():
                 print(f"WAR TURN {cur}: single-call war decision", flush=True)
                 war_trk.on_turn(cur)
                 stale = war_trk.stalemate_flags(cur)
-                assessment = front_assessment(st.get("front_lines", []), stale)
+                assessment = front_assessment(st.get("front_lines", []), stale, st)
                 history = build_history(session_dir)
                 ctx = build_turn_context(st, history)
                 strat = read_strategy(game_root)
