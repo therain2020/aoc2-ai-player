@@ -323,6 +323,7 @@ def main():
     cadence = mech_cadence.CadenceTracker()
     vision = None
     war_llm_fail_streak = 0
+    last_war_fallback_turn = -99
 
     def record_skip(cur, phase, ledger, reason) -> None:
         """T043: LLM 失败/输出无效兜底——SKIP_TURN 确定性推进 + FAIL 标记；
@@ -430,8 +431,10 @@ def main():
                 if last_war_turn == cur:
                     time.sleep(3)
                     continue
-                if war_llm_fail_streak >= 2:
-                    # 网络断（DNS 失败回退）：war 决策直接用规则订单，不空转
+                if war_llm_fail_streak >= 2 and (cur - last_war_fallback_turn) < 2:
+                    # 网络断（DNS 失败回退）：war 决策用规则订单不空转；
+                    # 每 2 回合夹一次 LLM 探测（网络恢复自动回归 LLM 决策）
+                    last_war_fallback_turn = cur
                     orders = war_planner.plan_war_turn(st) or [
                         {"action": "recruit_army",
                          "province_id": int((st.get("my_provinces") or [0])[0]), "count": 500}]
