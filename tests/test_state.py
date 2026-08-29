@@ -174,6 +174,10 @@ def test_fill_empty_turns():
     plan2 = {"turns": [{"offset": 1, "actions": []}]}
     _fill_empty_turns(plan2, {"tech_points": 12, "my_provinces": [7]})
     assert plan2["turns"][0]["actions"][0]["action"] == "invest_tech"
+    # 首回合即空且无科技点 -> 守卫征兵（最后兜底）
+    plan3 = {"turns": [{"offset": 1, "actions": [], "note": ""}, {"offset": 2, "actions": []}]}
+    _fill_empty_turns(plan3, {"tech_points": 0, "my_provinces": [7]})
+    assert plan3["turns"][0]["actions"][0]["action"] == "recruit_army"
 
 
 def test_victory_progress_budget_sliders():
