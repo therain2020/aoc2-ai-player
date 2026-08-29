@@ -12,8 +12,6 @@ REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))   # panel runs via `python agent/panel.py` -> cwd of script is agent/
 
-from agent.actions import result_ok  # noqa: E402  (after sys.path injection)
-
 PID_FILE = REPO / "agent.pid"
 LOG_FILE = REPO / "logs" / "agent.log"
 BRIDGE = "http://127.0.0.1:7187"   # EngineGateway (T014); legacy 9110 retired
@@ -179,73 +177,34 @@ def _config():
         return {}
 
 
-def _latest_turn_summary():
-    """(session_dir_name, rows, last_record) from the NEWEST agent session dir
-    (by dir mtime) — shows the current run even before its first turn lands."""
-    base = REPO / "sessions"
-    if not base.exists():
-        return None
-    import json
-    dirs = sorted((d for d in base.iterdir() if d.is_dir() and "agent" in d.name),
-                  key=lambda d: d.stat().st_mtime, reverse=True)
-    for d in dirs[:3]:
-        p = d / "turns.jsonl"
-        if not p.exists():
-            return (d.name, 0, None)
-        n = 0
-        last = None
-        try:
-            with p.open("r", encoding="utf-8") as f:
-                for line in f:
-                    n += 1
-                    last = json.loads(line)
-        except (OSError, json.JSONDecodeError):
-            pass
-        return (d.name, n, last)
-    return None
-
-
 def show_status():
-    agent_pids = _agent_pids()
-    recorded = read_pid()
-    alive = recorded and is_alive(recorded)
-    print(f"  agent: recorded pid {recorded} | alive {'yes' if alive else 'no'} | "
-          f"cmdline pids {agent_pids or '--'}")
-    try:
-        import json
-        import urllib.request
-        with urllib.request.urlopen(BRIDGE + "/state", timeout=2) as r:
-            st = json.loads(r.read().decode())
-        print(f"  bridge: online | T{st.get('turn')} {st.get('date', '')} | {st.get('turn_state')} "
-              f"| in_game {st.get('in_game')} | 金{st.get('money')} 军{st.get('units')} "
-              f"省{st.get('provinces')} 科技点{st.get('tech_points')} 外交点{st.get('diplomacy_points')}")
-    except Exception as e:
-        print(f"  bridge: offline ({e})")
-    rec = _latest_turn_summary()
-    if rec is None:
-        print("  session: 尚无 agent 回合记录（turns.jsonl）")
+    """Unified status area (agent/status.snapshot): alive / bridge / session /
+    pause source / gear — no guessing."""
+    from agent import status as st_mod
+    from agent.mechanics.gears import GEAR_TEXT
+    snap = st_mod.snapshot(_config())
+    a = snap["agent"]
+    b = snap["bridge"]
+    s = snap["session"]
+    p = snap["pause"]
+    sg = snap["strategy"]
+    print(f"  agent: running={a['running']} | pids={a['pids'] or '--'} | pid_record={a['pid_record']}")
+    if b:
+        print(f"  bridge: online | T{b.get('turn')} {b.get('date', '')} | {b.get('turn_state')} "
+              f"| in_game {b.get('in_game')} | 金{b.get('money')} 军{b.get('units')} 省{b.get('provinces')}")
     else:
-        dn, rows, last = rec
-        if last is None:
-            print(f"  session: {dn} | turns.jsonl 空文件")
-        else:
-            ok = sum(1 for r in (last.get("results") or []) if result_ok(r.get("result", "")))
-            print(f"  session: {dn} | turns.jsonl {rows} 行 | 最新 T{last.get('turn')} "
-                  f"type={last.get('type')} brief={str(last.get('brief'))[:40]} "
-                  f"ok={ok}/{len(last.get('results') or [])}")
-            if last.get("fail_reason"):
-                print(f"  ⚠ 上次回合 FAIL: {last.get('fail_reason')}")
-    root = (_config().get("game") or {}).get("root", "")
-    if root:
-        pause = Path(root) / "aoc2_pause.txt"
-        strat = Path(root) / "aoc2_strategy.txt"
-        strat_s = ""
-        if strat.exists():
-            try:
-                strat_s = strat.read_text(encoding="utf-8").strip()[:120]
-            except Exception:
-                strat_s = "(读取失败)"
-        print(f"  暂停(END): {'存在=已暂停' if pause.exists() else '无'} | 用户战略: {strat_s or '（无）'}")
+        print("  bridge: offline")
+    if s:
+        print(f"  session: {s['name']} | turns.jsonl {s['rows']} 行 | 最新 T{s.get('turn')} "
+              f"{s.get('type') or ''} {s.get('brief') or ''}")
+    else:
+        print("  session: --")
+    if p["paused"]:
+        print(f"  pause: 已暂停（来源 {p['by']} @ {p['ts']}）— 恢复=删除暂停文件")
+    else:
+        print("  pause: 否")
+    if sg.get("gear"):
+        print(f"  strategy gear: {GEAR_TEXT[sg['gear'] - 1]}")
     print(f"  log: logs/agent.log {LOG_FILE.stat().st_size if LOG_FILE.exists() else 0} bytes")
 
 

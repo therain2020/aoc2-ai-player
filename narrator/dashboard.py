@@ -243,9 +243,14 @@ async function poll() {
   try {
     const r = await fetch('/api/state');
     state = await r.json();
+    const agentTag = state.agent_alive
+      ? '<b style="color:#7fd99a">Agent 运行中</b>' : '<b>Agent 未运行</b>';
+    const pauseTag = state.paused
+      ? ' · <b class="paused">已暂停</b> <span class="sub">(' + (state.pause_by||'?') +
+        (state.pause_ts ? ' ' + state.pause_ts : '') + ')</span>' : '';
     document.getElementById('conn').textContent =
-      '会话: ' + (state.session||'') + ' · 回合 ' + state.turn +
-      ' · ' + now() + (state.paused ? ' · <b class="paused">已暂停</b>' : '');
+      agentTag + ' · 会话: ' + (state.session||'') + ' · 回合 ' + state.turn +
+      ' · ' + now() + pauseTag;
     renderStats(); renderTokens(); renderCurve();
   } catch(e) { ok = false; document.getElementById('conn').textContent = '等待 agent 启动…'; }
   try { renderPlan(await req('GET', '/api/plan')); } catch(e) {}
@@ -440,6 +445,7 @@ class Handler(BaseHTTPRequestHandler):
     cost_out = 8.0
     auto_follow = True
     model = ""
+    agent_snap = {"agent": {"running": False, "pids": []}}
 
     def _json(self, obj, status: int = 200):
         data = json.dumps(obj, ensure_ascii=False).encode("utf-8")
@@ -476,6 +482,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def _api_state(self):
         st = fetch_state_cached()
+        try:
+            from agent import status as agent_status
+            self.agent_snap = agent_status.snapshot({"game": {"root": str(game_root())}})
+        except Exception:
+            self.agent_snap = {"agent": {"running": False, "pids": []}}
         head = {
             "turn": st.get("turn"),
             "date": st.get("date"),
@@ -491,6 +502,9 @@ class Handler(BaseHTTPRequestHandler):
             "paused": is_paused(),
             "pause_by": pause_meta().get("pause_by"),
             "pause_ts": pause_meta().get("pause_ts"),
+            # unified agent status (agent/status.py snapshot subset)
+            "agent_alive": bool(self.agent_snap["agent"]["running"]),
+            "agent_pids": self.agent_snap["agent"]["pids"],
             "session": self.session_dir.name if self.session_dir else "",
         }
         # per-turn records → 曲线 + 最新机制阶段

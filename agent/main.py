@@ -177,6 +177,18 @@ def str_sig(s: str) -> str:
     return hashlib.md5((s or "").encode("utf-8")).hexdigest()
 
 
+def _plan_addresses(plan: dict, thr: dict) -> bool:
+    """Does the current plan already respond to the threat (war/gift/relations)?"""
+    target = thr.get("civ_id")
+    for t in plan.get("turns", []):
+        for a in t.get("actions", []):
+            name = a.get("action")
+            if name in ("declare_war", "send_gift", "improve_relations",
+                        "buy_war", "coalition_war") and a.get("target_civ_id") == target:
+                return True
+    return False
+
+
 def _pause_status(game_root: str) -> str:
     """Pause source summary at startup — NEVER auto-delete (user pauses are sacred)."""
     p = Path(game_root) / "aoc2_pause.txt"
@@ -305,6 +317,7 @@ def main():
     war_trk = WarTracker()
     prev_provinces = 0
     fail_streak = 0
+    last_danger_replan = -99
 
     def record_skip(cur, phase, ledger, reason) -> None:
         """T043: LLM 失败/输出无效兜底——SKIP_TURN 确定性推进 + FAIL 标记；
@@ -464,17 +477,20 @@ def main():
                 plan = None
                 strategy_sig = s_sig
 
-            # emergency checks: territory lost OR hostile army overtakes mine
+            # emergency checks: territory lost OR hostile army overtakes mine.
+            # DANGER re-plans at most once per 3 turns, unless the current plan
+            # does NOT address the threat (cooldown prevents LLM burn loops).
             thr = threat_scan(st)
             if plan is not None:
                 base_prov = plan.get("base_provinces", 0)
                 if cur > planned_turn and st.get("provinces", 0) < base_prov:
                     print(f"EMERGENCY: provinces {base_prov} -> {st.get('provinces')}, re-planning", flush=True)
                     plan = None
-                if thr:
+                if thr and (cur - last_danger_replan >= 3 or not _plan_addresses(plan, thr)):
                     print(f"DANGER: civ{thr['civ_id']} units {thr['units']} >= {thr['ratio']}x mine -> re-plan",
                           flush=True)
                     plan = None
+                    last_danger_replan = cur
 
             if plan is None:
                 plan_cycles += 1
