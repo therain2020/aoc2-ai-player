@@ -27,7 +27,8 @@ def sanitize_actions(actions: list[dict], st: dict, fail_provinces=()) -> list[d
     out: list[dict] = []
     declared = 0
     recruits = 0
-    broke = float(st.get("money") or 0) < 0     # 破产：禁止再募兵（止血）
+    # 金<500 = 破产前置线：禁止再募兵（防空耗金库；引擎 AI 同款 0.5K 底线）
+    broke = float(st.get("money") or 0) < 500
     for a in actions:
         if not isinstance(a, dict) or "action" not in a:
             continue

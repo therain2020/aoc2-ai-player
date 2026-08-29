@@ -559,6 +559,29 @@ def main():
                         my_score = int(w.get("my_score") or 0)
                     except (TypeError, ValueError):
                         continue
+                # 僵持提前止损（2026-08-29：得分 0 且 15 回合无占领→自动求和；39/49 阈值对引擎
+                # AI 太长，玩家版需更快止损防止空耗金库）
+                if (war_trk.last_conquest is not None
+                        and cur - war_trk.last_conquest >= 15
+                        and abs(my_score_now) <= 10):
+                    target = _war_opponent(st, int(st.get("my_civ") or -1))
+                    if target is not None:
+                        _r = bridge.peace_treaty(target)
+                        print(f"  僵持止损(15回合无占领,分{my_score_now}) → peace_treaty(civ{target}): {str(_r)[:60]}",
+                              flush=True)
+                        round_append(session_dir, {
+                            "turn": cur, "ts": time.time(), "type": "war",
+                            "mechanic_phase": phase.phase_id, "tactic_ref": phase.tactic_ref,
+                            "ledger": ledger,
+                            "decision": [{"action": "peace_treaty", "target_civ_id": target}],
+                            "results": [{"action": "peace_treaty", "result": _r}],
+                            "brief": "僵持提前止损(15回合)",
+                            "tokens": dict(provider.last_usage), "tokens_cum": dict(provider.total),
+                        })
+                        last_war_turn = cur
+                        bridge.end_turn()
+                        time.sleep(4)
+                        continue
                 if my_score <= -20:
                     target = _war_opponent(st, int(st.get("my_civ") or -1))
                     if target is not None:

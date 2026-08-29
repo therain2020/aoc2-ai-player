@@ -43,6 +43,8 @@ def test_bankrupt_blocks_recruit():
     acts = [{"action": "recruit_army", "province_id": 1, "count": 100}]
     st = _st(); st["money"] = -500
     assert sanitize_actions(acts, st) == []
+    st["money"] = 300                                # 500 前置线之下也禁募
+    assert sanitize_actions(acts, st) == []
 
 
 def test_recruit_capped_two_batches():
