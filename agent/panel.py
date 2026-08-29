@@ -8,7 +8,11 @@ import sys
 import time
 from pathlib import Path
 
+from agent.actions import result_ok
+
 REPO = Path(__file__).resolve().parents[1]
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))   # panel runs via `python agent/panel.py` -> cwd of script is agent/
 PID_FILE = REPO / "agent.pid"
 LOG_FILE = REPO / "logs" / "agent.log"
 BRIDGE = "http://127.0.0.1:7187"   # EngineGateway (T014); legacy 9110 retired
@@ -220,7 +224,6 @@ def show_status():
         if last is None:
             print(f"  session: {dn} | turns.jsonl 空文件")
         else:
-            from agent.actions import result_ok
             ok = sum(1 for r in (last.get("results") or []) if result_ok(r.get("result", "")))
             print(f"  session: {dn} | turns.jsonl {rows} 行 | 最新 T{last.get('turn')} "
                   f"type={last.get('type')} brief={str(last.get('brief'))[:40]} "
