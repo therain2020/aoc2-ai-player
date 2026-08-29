@@ -27,7 +27,10 @@ from agent.llm.base import LLMError  # noqa: E402
 from agent.state import build_history, build_turn_context, extract_ledger, ledger_line  # noqa: E402
 from agent.mechanics import phases as mech_phases  # noqa: E402
 from agent.mechanics import prompts as mech_prompts  # noqa: E402
-from agent.messages import decision_types, auto_types  # noqa: E402
+from agent.messages import (  # noqa: E402
+    decision_types, fixed_types, ignore_types, resolve_params, FIXED_RULES,
+    split_types,
+)
 from agent.context_store import CtxStore  # noqa: E402
 from recorder.session import create_session  # noqa: E402
 
@@ -120,6 +123,39 @@ def write_plan(session_dir: Path, plan: dict):
 def round_append(session_dir: Path, record: dict):
     with open(session_dir / "turns.jsonl", "a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def handle_messages(bridge, ctx_store, st) -> str:
+    """Three-kind message dispatch (user principle 2026-08-29):
+    - decision -> agent decides (never auto-respond); re-plan happens upstream
+    - fixed    -> run the rule action (e.g. civilize self), then clear bundle
+    - ignore   -> context record only, then clear bundle
+    Returns "decision" or "auto" (fixed/ignore both land in auto class here).
+    """
+    mtypes = st.get("msg_types", "")
+    dtypes = decision_types(mtypes)
+    if dtypes:
+        ctx_store.add_event("decision", ",".join(dtypes[:8]))
+        print(f"DECISION MSG [{dtypes}] -> agent decides (no auto-respond)", flush=True)
+        return "decision"
+    for m in fixed_types(mtypes):
+        rule = FIXED_RULES.get(m)
+        if not rule:
+            continue
+        try:
+            params = resolve_params(rule["params"], st)
+            r = getattr(bridge, rule["action"])(**params)
+            print(f"FIXED MSG {m} -> {rule['action']} {params}: {str(r)[:110]}", flush=True)
+            ctx_store.add_event("fixed", f"{m}:{str(r)[:60]}")
+        except Exception as e:
+            print(f"FIXED MSG {m} skipped ({e})", flush=True)
+    ctx_store.sync_neighbors(st.get("neighbors", []))
+    itypes = ignore_types(mtypes)
+    if itypes:
+        ctx_store.add_event("ignore", ",".join(itypes[:12]))
+    bridge.respond_messages()
+    print(f"AUTO MSG [{mtypes}] -> context only", flush=True)
+    return "auto"
 
 
 def set_msg_lines(ctx_store, st) -> str:
@@ -329,21 +365,10 @@ def main():
             at_war = bool(st.get("wars")) or any(n.get("war") for n in st.get("neighbors", []))
             if at_war:
                 if st.get("messages", 0) > 0:
-                    mtypes = st.get("msg_types", "")
-                    dtypes = decision_types(mtypes)
-                    if dtypes:
-                        # decision-class msgs must NOT be cleared during war:
-                        # log them into ctx so this turn's war decision can act
-                        # (e.g. civilize confirm / peace with other civs)
-                        ctx_store.add_event("decision", ",".join(dtypes))
-                        print(f"DECISION MSG during war [{dtypes}] -> ctx only",
-                              flush=True)
+                    kind = handle_messages(bridge, ctx_store, st)
+                    if kind == "decision":
                         time.sleep(1)
                         continue
-                    bridge.respond_messages()
-                    ctx_store.sync_neighbors(st.get("neighbors", []))
-                    ctx_store.add_event("auto", ",".join(auto_types(mtypes)[:8]))
-                    time.sleep(1)
                 if last_war_turn == cur:
                     time.sleep(5)
                     continue
@@ -398,23 +423,14 @@ def main():
                 time.sleep(4)
                 continue
 
-            # messages (2026-08-29 two-kind model):
-            #   auto      = relation/periodic/feedback -> consume + context sync, ZERO LLM
-            #   decision  = war/peace/trade/... requests -> agent decides; NEVER auto-respond
+            # messages (three-kind model 2026-08-29):
+            #   decision = needs agent judgement -> NEVER auto-respond, re-plan
+            #   fixed    = rule action (civilize etc.) runs, then cleared
+            #   ignore   = pure notification -> context only, cleared
             if st.get("messages", 0) > 0:
-                mtypes = st.get("msg_types", "")
-                dtypes = decision_types(mtypes)
-                if not dtypes:
-                    atypes = auto_types(mtypes)
-                    bridge.respond_messages()
-                    ctx_store.sync_neighbors(st.get("neighbors", []))
-                    ctx_store.add_event("auto", ",".join(atypes[:8]))
-                    print(f"AUTO MSG [{mtypes}] -> context only", flush=True)
-                    time.sleep(1)
-                    continue
-                print(f"DECISION MSG [{dtypes}] -> agent (no auto-respond)", flush=True)
-                ctx_store.add_event("decision", ",".join(dtypes))
-                plan = None          # fresh plan/decision this turn
+                kind = handle_messages(bridge, ctx_store, st)
+                if kind == "decision":
+                    plan = None          # fresh plan/decision this turn
                 time.sleep(1)
                 continue
 
