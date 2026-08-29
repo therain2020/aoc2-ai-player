@@ -40,19 +40,19 @@ def plan_war_turn(st: dict) -> list[dict]:
         count = max(int(my * 0.8), MOVE_MIN)
         orders.append({"action": "move_army", "from_province": int(t["from"]),
                        "to_province": int(t["to"]), "count": count})
-        # 全线推进：所有可攻前线条目一并下单一回合（超级大脑，不限条数）
+        # 全线推进：全部可攻前线条目一回合全下（焦点=歼灭敌方存在，不设路数限制）
         others = [f for f in attackable if f is not t and int(f.get("my_units") or 0) >= MOVE_MIN
                   and int(f.get("my_units") or 0) > int(f.get("enemy_units") or 0)]
-        for o in sorted(others, key=lambda f: int(f.get("enemy_units") or 9e9))[:4]:
+        for o in sorted(others, key=lambda f: int(f.get("enemy_units") or 9e9)):
             omy = int(o.get("my_units") or 0)
             orders.append({"action": "move_army", "from_province": int(o["from"]),
                            "to_province": int(o["to"]),
                            "count": max(int(omy * 0.8), MOVE_MIN)})
 
-    # ③ 动员：聚焦当前最重要（主力进攻优先；动员最多 2 批，不铺开失焦）
+    # ③ 动员：批次由行动点动态决定（12 点/批），不设固定数量
     if move_pts >= 8:
-        n_recruit = 2 if move_pts >= 24 else 1
-        for i in range(min(n_recruit, len(provs))):
+        n_recruit = min(max(1, move_pts // 12), len(provs))
+        for i in range(n_recruit):
             orders.append({"action": "recruit_army",
                            "province_id": int(provs[i]), "count": MOBILIZE})
     return orders
