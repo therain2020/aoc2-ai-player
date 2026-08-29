@@ -431,6 +431,37 @@ def main():
                 if last_war_turn == cur:
                     time.sleep(3)
                     continue
+                # 胜利点满分收割（最高优先级：先于断网回退/LLM——用户："满分自动和谈拿满领土"）
+                # AI_UseVictoryPoints 按己占10/邻接core5/邻接4.25/core1.75/沿海0.325 评分×距离自动割地+附庸化；
+                # 阈值 90 = 引擎 0-100 分数（含舍入）确保触发，不再拖到 95
+                _score = 0
+                for _w in st.get("wars", []) or []:
+                    try:
+                        _score = int(_w.get("my_score") or 0)
+                    except (TypeError, ValueError):
+                        pass
+                _tgt = None
+                for _n in st.get("neighbors", []):
+                    if _n.get("war"):
+                        _tgt = _n.get("civ_id")
+                        break
+                if _score >= 90 and _tgt is not None:
+                    _r = bridge.peace_treaty(_tgt)
+                    print(f"  ★ 收割求和: 胜利点{_score}≥90 → peace_treaty(civ{_tgt}): {str(_r)[:70]}",
+                          flush=True)
+                    round_append(session_dir, {
+                        "turn": cur, "ts": time.time(), "type": "war",
+                        "mechanic_phase": phase.phase_id, "tactic_ref": phase.tactic_ref,
+                        "ledger": ledger,
+                        "decision": [{"action": "peace_treaty", "target_civ_id": _tgt}],
+                        "results": [{"action": "peace_treaty", "result": _r}],
+                        "brief": "胜利点满分→自动收割求和",
+                        "tokens": dict(provider.last_usage), "tokens_cum": dict(provider.total),
+                    })
+                    last_war_turn = cur
+                    bridge.end_turn()
+                    time.sleep(4)
+                    continue
                 if war_llm_fail_streak >= 2 and (cur - last_war_fallback_turn) < 2:
                     # 网络断（DNS 失败回退）：war 决策用规则订单不空转；
                     # 每 2 回合夹一次 LLM 探测（网络恢复自动回归 LLM 决策）
@@ -466,31 +497,6 @@ def main():
                     except (TypeError, ValueError):
                         pass
                 enemy_units_now = sum(int(n.get("units") or 0) for n in st.get("neighbors", []) if n.get("war"))
-                # 胜利点满分收割（用户 2026-08-29：war_score 达 100 → 主动和谈获取领土）：
-                # PeaceTreaty_Data.AI_UseVictoryPoints 按胜利点自动分配割地（己占/邻接/core 评分×距离），
-                # 100 分=大收割——不必打到灭国即锁定战果
-                target_war = None
-                for n in st.get("neighbors", []):
-                    if n.get("war"):
-                        target_war = n.get("civ_id")
-                        break
-                if my_score_now >= 95 and target_war is not None:
-                    r = bridge.peace_treaty(target_war)
-                    print(f"  胜利点 {my_score_now}≥95 → 收割求和 peace_treaty(civ{target_war}): {str(r)[:70]}",
-                          flush=True)
-                    round_append(session_dir, {
-                        "turn": cur, "ts": time.time(), "type": "war",
-                        "mechanic_phase": phase.phase_id, "tactic_ref": phase.tactic_ref,
-                        "ledger": ledger,
-                        "decision": [{"action": "peace_treaty", "target_civ_id": target_war}],
-                        "results": [{"action": "peace_treaty", "result": r}],
-                        "brief": "胜利点满分→收割求和（自动分配领土）",
-                        "tokens": dict(provider.last_usage), "tokens_cum": dict(provider.total),
-                    })
-                    last_war_turn = cur
-                    bridge.end_turn()
-                    time.sleep(4)
-                    continue
                 if ("Message_WeCanSignPeace" in (st.get("msg_types") or "") or
                         "Message_PeaceTreaty" in (st.get("msg_types") or "")):
                     if my_score_now >= 20 and my_score_now < 95:
