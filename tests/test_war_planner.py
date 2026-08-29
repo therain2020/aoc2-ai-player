@@ -45,3 +45,17 @@ def test_capital_priority():
     orders = plan_war_turn(st)
     moves = [o for o in orders if o["action"] == "move_army"]
     assert moves[0]["to_province"] == 900         # 优先奔袭敌首都
+
+
+def test_guard_empty_front_and_never_empty_turn():
+    # 战线我 0 兵 + 后方邻接省有兵 → 守备 move；且无空订单
+    st = {"turn": 1, "units": 3000, "move_points": 40, "my_provinces": [10, 20],
+          "my_civ": 4,
+          "armies_overview": [{"prov": 10, "army": 0}, {"prov": 20, "army": 2000}],
+          "adjacency": [{"mine": 20, "nbr": 10, "civ": 4}],
+          "neighbors": [{"civ_id": 55, "war": True, "capital": 900, "units": 1500}],
+          "front_lines": [{"from": 10, "to": 100, "civ": 55, "my_units": 0, "enemy_units": 300}]}
+    orders = plan_war_turn(st)
+    assert orders, "绝不空操作"
+    guards = [o for o in orders if o["action"] == "move_army" and o["to_province"] == 10]
+    assert guards and guards[0]["count"] >= 200   # 从 20 调兵守 10

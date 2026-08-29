@@ -31,10 +31,18 @@ def _recruit_target(st: dict) -> list[int]:
 
 
 def plan_war_turn(st: dict) -> list[dict]:
+    """四项战争纪律（用户 2026-08-29）：①调兵攻击 ②及时补员 ③防范空省被夺 ④绝不空操作回合。"""
     orders: list[dict] = []
     fronts = st.get("front_lines") or []
     provs = st.get("my_provinces") or [0]
     move_pts = int(st.get("move_points") or 0)
+    armies = {int(a.get("prov")): int(a.get("army") or 0) for a in (st.get("armies_overview") or [])}
+    # 我方↔我方邻接（守备/集结边）
+    adj_mine: dict[int, list[int]] = {}
+    for a in st.get("adjacency") or []:
+        if int(a.get("civ") or -1) != int(st.get("my_civ") or -1):
+            continue
+        adj_mine.setdefault(int(a["mine"]), []).append(int(a["nbr"]))
 
     # 敌首都 id（交战国邻的 capital）
     war_caps = {n.get("civ_id"): n.get("capital")
@@ -73,6 +81,27 @@ def plan_war_turn(st: dict) -> list[dict]:
         for p in targets[:2]:
             orders.append({"action": "recruit_army",
                            "province_id": p, "count": MOBILIZE})
+
+    # ③b 守备空省：告急走廊（前线省驻军<50）← 从邻接有兵省调防（防被夺）
+    weak_fronts = [int(f.get("from")) for f in fronts
+                   if armies.get(int(f.get("from")), int(f.get("my_units") or 0)) < 50]
+    for wp in weak_fronts:
+        if orders and len(orders) >= 5:
+            break
+        for nb in adj_mine.get(wp, []):
+            if armies.get(nb, 0) > 100 and nb != wp:
+                count = min(int(armies[nb] * 0.6), armies[nb] - 20)
+                if count >= 10:
+                    orders.append({"action": "move_army", "from_province": nb,
+                                   "to_province": wp, "count": count})
+                    armies[wp] = armies.get(wp, 0) + count
+                    armies[nb] -= count
+                    break
+
+    # ④ 绝不空操作：无订单 → 最小守备（征兵防线省，禁止空回合）
+    if not orders:
+        orders.append({"action": "recruit_army",
+                       "province_id": int((_recruit_target(st) or [provs[0]])[0]), "count": 200})
     return orders
 
 
