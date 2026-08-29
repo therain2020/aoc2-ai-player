@@ -16,16 +16,18 @@ def generate_vision(provider, st: dict, session_dir: Path, strat: str = "") -> d
     """Produce a vision dict via the LLM (JSON {brief, focus})."""
     from agent.mechanics import prompts as mech_prompts
     from agent.state import build_turn_context, ledger_line, victory_progress
+    inc = st.get("income") or {}
+    ledger = {
+        "gold": st.get("money"),
+        "move_pts": st.get("move_points"),
+        "diplo_pts": st.get("diplomacy_points"),
+        "tech_pts": st.get("tech_points"),
+        "income": {k: inc.get(k) for k in ("gold", "move", "diplo", "tech")} if inc else None,
+    }
     ctx = build_turn_context(st, "（无历史）")
     if strat:
-        ctx = f"【用户战略指示】{strat}\n" + ctx
-    ctx = (f"{ledger_line({'gold': st.get('money'), 'move_pts': st.get('move_points'),
-                           'diplo_pts': st.get('diplomacy_points'), 'tech_pts': st.get('tech_points'),
-                           'income': {k: st.get('income', {}).get(k) for k in
-                                      ('gold', 'move', 'diplo', 'tech')} if st.get('income') else None})}\n"
-           + victory_progress(st, session_dir)
-           + "\n"
-           + ctx)
+        ctx = "【用户战略指示】" + str(strat) + "\n" + ctx
+    ctx = ledger_line(ledger) + "\n" + victory_progress(st, session_dir) + "\n" + ctx
     raw = provider.chat(mech_prompts.build_vision_system(), ctx,
                         temperature=0.3, max_tokens=800)
     data = _parse(raw)

@@ -366,9 +366,20 @@ function planCard(plan) {
 
 function renderPlan(p) {
   const key = JSON.stringify(p);
-  if (key === planHtml || !p || !p.turns) return;   // 不变不重绘（增量）
+  if (key === planHtml || !p) return;   // 不变不重绘（增量）
   planHtml = key;
-  el('plan').innerHTML = p.turns ? planCard(p) : '<div class="planline">（计划未生成）</div>';
+  let html;
+  if (p.kind === 'vision') {
+    html = '<div class="card"><div class="head"><span class="turn">战略愿景</span>'
+      + '<span class="ts">T' + (p.base_turn || '?') + ' 生成 · 每10回合/重大变化刷新</span></div>'
+      + '<div class="brief">' + (p.brief || '') + '</div>'
+      + '<div>' + (p.focus || []).map(f => '<span class="chip">' + f + '</span>').join('') + '</div></div>';
+  } else if (p.turns) {
+    html = planCard(p);
+  } else {
+    html = '<div class="planline">（愿景未生成）</div>';
+  }
+  el('plan').innerHTML = html;
 }
 
 function cardHtml(t) {
@@ -474,6 +485,17 @@ class Handler(BaseHTTPRequestHandler):
             self._json(turns)
             return
         if self.path == "/api/plan":
+            # 范式切换：愿景存于 session plan.json（kind=vision）
+            if self.session_dir:
+                vp = Path(self.session_dir) / "plan.json"
+                if vp.exists():
+                    try:
+                        data = json.loads(vp.read_text(encoding="utf-8"))
+                        if isinstance(data, dict) and data.get("kind") == "vision":
+                            self._json(data)
+                            return
+                    except (json.JSONDecodeError, OSError):
+                        pass
             p = fetch_bridge("/plan")
             self._json(p.get("detail") or p if isinstance(p, dict) else p)
             return
