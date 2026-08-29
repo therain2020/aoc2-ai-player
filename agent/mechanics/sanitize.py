@@ -30,12 +30,21 @@ def sanitize_actions(actions: list[dict], st: dict) -> list[dict]:
             continue
         n = a.get("action")
         if n == "move_army":
-            key = (int(a.get("from_province", -1)), int(a.get("to_province", -1)))
-            if key not in fronts:
-                continue                       # 非真实前线对：丢弃
-            own = fronts[key]
-            a["count"] = max(10, min(int(a.get("count") or 10), own))
-            out.append(a)
+            frm = int(a.get("from_province", -1))
+            to = int(a.get("to_province", -1))
+            if frm == to:
+                continue
+            mine = set(int(p) for p in (st.get("my_provinces") or []))
+            key = (frm, to)
+            if key in fronts:
+                own = fronts[key]
+                a["count"] = max(10, min(int(a.get("count") or 10), own))
+                out.append(a)                   # 进攻：仅前线对，兵≥10 ≤省兵
+            elif frm in mine and to in mine:
+                a["count"] = max(1, int(a.get("count") or 1))
+                out.append(a)                   # 集结：我方省→我方省（调兵上战线，放行）
+            else:
+                continue                        # 越界/未知对：丢弃
         elif n == "declare_war":
             if declared >= 1:
                 continue                       # 每回合至多一次新宣战

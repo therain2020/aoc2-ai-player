@@ -119,7 +119,7 @@ final class EngineState {
                 try {
                     int armyV = 0;
                     try {
-                        armyV = ((Integer) EngineApi.call(EngineApi.call(game(), "getProvince", pid), "getArmy", me)).intValue();
+                        armyV = ((Integer) EngineApi.call(EngineApi.call(game(), "getProvince", pid), "getArmyCivID", me)).intValue();
                     } catch (Throwable ignoredArmy) {
                     }
                     Object prov = EngineApi.call(game(), "getProvince", pid);
@@ -345,12 +345,12 @@ final class EngineState {
                             Object myArmy = null;
                             Object enemyArmy = null;
                             try {
-                                myArmy = EngineApi.call(prov, "getArmy", me);
+                                myArmy = EngineApi.call(prov, "getArmyCivID", me);
                             } catch (Throwable ignoredArmy) {
                             }
                             try {
                                 enemyArmy = EngineApi.call(
-                                        EngineApi.call(game(), "getProvince", ep), "getArmy", ec);
+                                        EngineApi.call(game(), "getProvince", ep), "getArmyCivID", ec);
                             } catch (Throwable ignoredArmy) {
                             }
                             // 2026-08-29: army getter may fail for occupied/war zones —
@@ -468,6 +468,31 @@ final class EngineState {
                   .append(",\"balance\":").append(balance)
                   .append(",\"diplo_delta\":").append(diploDelta)
                   .append("}");
+            } catch (Throwable ignored) {
+            }
+            // contract extras — armies overview: EVERY province with MY army >0
+            // (user fix 2026-08-29: getArmyCivID is the safe per-civ reader —
+            // shows where my garrisons actually are, not just front pairs)
+            try {
+                StringBuilder aw = new StringBuilder("[");
+                boolean firstArmy = true;
+                for (int pidA = 0; pidA < provincialSize; ++pidA) {
+                    Object provA = EngineApi.call(game(), "getProvince", pidA);
+                    if (((Integer) EngineApi.call(provA, "getCivID")).intValue() != me) {
+                        continue;
+                    }
+                    int aN = ((Integer) EngineApi.call(provA, "getArmyCivID", me)).intValue();
+                    if (aN <= 0) {
+                        continue;
+                    }
+                    if (!firstArmy) {
+                        aw.append(',');
+                    }
+                    firstArmy = false;
+                    aw.append("{\"prov\":").append(pidA).append(",\"army\":").append(aN).append("}");
+                }
+                aw.append("]");
+                sb.append(",\"armies_overview\":").append(aw);
             } catch (Throwable ignored) {
             }
             // contract extras — budget sliders (Budget 面板滑块，玩家等价可调)
