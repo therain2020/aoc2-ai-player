@@ -212,7 +212,7 @@ PAGE = """<!DOCTYPE html>
   </div>
 </div>
 <script>
-const GEARS = /*__GEARS__*/[];
+const GEARS = /*__GEARS__*/;
 let state = null, planHtml = "", rendered = new Set(), flow = [];
 
 function req(method, path, body) {
