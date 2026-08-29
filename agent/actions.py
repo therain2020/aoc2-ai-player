@@ -257,9 +257,10 @@ def _validate_actions(raw_actions: list) -> list:
 def actions_prompt_spec() -> str:
     """Describe the action space for the LLM system prompt."""
     return (
-        "输出 JSON {actions:[...], brief:\"...\"}。动作数量无人为上限——引擎资源（行动点/金库/外交点/冷却）"
-        "即硬上限。你必须依【资源台账】做取舍：先做当前最重要的事（通常 1-4 条精选），"
-        "预算有余再考虑次优先，严禁为凑数量铺开动作失焦。\n"
+        "输出 JSON {actions:[...], brief:\"...\"}。动作数量无人工上限，资源（行动点/金库/外交点/冷却）"
+        "即硬上限；数量由局面自然决定——当下最重要的事若是大战役（多省动员、多路进攻）就完整列出该战役"
+        "的全部动作，无事可做就给最少必要动作。**没有数量预置**，唯一标准：注意力在优先级最高的目标上，"
+        "低优先级让位；禁止凑数，也禁止遗漏紧急事项。\n"
         "declare_war{target_civ_id} 宣战 | recruit_army{province_id,count} 征兵 | "
         "move_army{from_province,to_province,count} 移军(须相邻) | "
         "invest{province_id,gold} 金币投资经济 | invest_dev{province_id,gold} 投资发展(需行动点≥8) |\n"
