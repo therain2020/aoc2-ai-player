@@ -56,30 +56,15 @@ public class Launcher {
                         public MethodVisitor visitMethod(int access, String name, String desc,
                                                          String signature, String[] exceptions) {
                             MethodVisitor mv = super.visitMethod(access, name, desc, signature, exceptions);
+                            // FR-006: hotkeys (Insert/PageUp/PageDown/END) removed — only tick + HUD draw stay
                             boolean isTick = name.equals("render") || name.equals("draw");
-                            boolean isKey = name.equals("keyDown");
-                            boolean isChar = name.equals("keyTyped");
-                            if (!isTick && !isKey && !isChar) {
+                            if (!isTick) {
                                 return mv;
                             }
                             return new MethodVisitor(Opcodes.ASM9, mv) {
                                 @Override
                                 public void visitCode() {
                                     super.visitCode();
-                                    if (isKey) {
-                                        mv.visitVarInsn(Opcodes.ILOAD, 1);
-                                        mv.visitMethodInsn(Opcodes.INVOKESTATIC,
-                                                "age/of/civilizations2/jakowski/lukasz/AgentBridge",
-                                                "handleKey", "(I)V", false);
-                                        return;
-                                    }
-                                    if (isChar) {
-                                        mv.visitVarInsn(Opcodes.ILOAD, 1);
-                                        mv.visitMethodInsn(Opcodes.INVOKESTATIC,
-                                                "age/of/civilizations2/jakowski/lukasz/AgentBridge",
-                                                "handleChar", "(C)V", false);
-                                        return;
-                                    }
                                     mv.visitMethodInsn(Opcodes.INVOKESTATIC,
                                             "age/of/civilizations2/jakowski/lukasz/AgentBridge", "tick", "()V", false);
                                 }

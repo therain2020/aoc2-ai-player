@@ -74,7 +74,7 @@
 - [ ] T022 [US2] `narrator/dashboard.py` 指挥控件：POST /api/command（strategy_text/gear/pause → 写 aoc2_strategy.txt + 暂停文件；校验档位 1-6、文本非空）（dashboard-api.md）
 - [ ] T023 [US2] [P] `narrator/dashboard.py` 监控面板：GET /api/state TTL 2s（决策流/资源台账/国家状态）+ 前端轮询
 - [ ] T024 [US2] [P] 计划面板：GET /api/plan → 10 回合计划 + brief + tactic_ref 渲染
-- [ ] T025 [US2] FR-006 收尾：`AgentBridge`/新桥侧移除热键处理（Insert/PageUp/PageDown/END 已决议移除）；HUD 只读链路（/hud → aoc2_hud.txt → 启动读回）由新桥保持
+- [x] T025 [US2] FR-006 收尾：`AgentBridge`/新桥侧移除热键处理（Insert/PageUp/PageDown/END 已决议移除）；HUD 只读链路（/hud → aoc2_hud.txt → 启动读回）由新桥保持
 - [ ] T026 [US2] US2 独立验证：按 quickstart §5 全项打卡（含 2s 刷新与重启恢复录屏证据）
 
 **Checkpoint**: US1+US2 双就绪——用户次日回来看板即可了解全程并可指挥

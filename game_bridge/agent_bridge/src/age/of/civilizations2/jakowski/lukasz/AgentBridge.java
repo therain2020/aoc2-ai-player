@@ -51,15 +51,6 @@ public class AgentBridge {
     }
 
     static long lastAutoAdv = 0L;
-    static int strategyLevel = 2;
-    static final String[] STRATEGIES = {
-            "①稳扎稳打：优先内政发展，只在极有把握时扩张",
-            "②均衡发展：内政与军备并举，伺机扩张",
-            "③积极扩张：主动征兵扩军，有优势即开战",
-            "④疯狂扩张：全力军事化，持续战争扩张",
-            "⑤外交结盟：积极结盟，借力扩张",
-            "⑥全面防御：停止扩张，巩固国防与内政",
-    };
 
     private static void persistHud() {
         try {
@@ -100,130 +91,9 @@ public class AgentBridge {
                 br.close();
                 if (line != null && line.trim().length() > 0) {
                     currentStrategy = line.trim();
-                    for (int i = 0; i < STRATEGIES.length; ++i) {
-                        if (STRATEGIES[i].equals(currentStrategy)) strategyLevel = i + 1;
-                    }
                 }
             }
         } catch (Throwable ignored) {
-        }
-    }
-    static boolean inputMode = false;
-    static StringBuilder inputBuf = new StringBuilder();
-
-    public static void handleKey(int keycode) {
-        try {
-            if (keycode == 132) {     // END: pause/resume Agent
-                java.io.File pf = new java.io.File("aoc2_pause.txt");
-                if (pf.exists()) {
-                    pf.delete();
-                    CFG.toast.setInView("Agent 已恢复（继续按计划执行）", new Color(0.6f, 0.95f, 0.7f, 1.0f));
-                    CFG.toast.setTimeInView(4000);
-                } else {
-                    java.io.OutputStreamWriter fw = new java.io.OutputStreamWriter(
-                            new java.io.FileOutputStream(pf), "UTF-8");
-                    fw.write("paused");
-                    fw.close();
-                    CFG.toast.setInView("Agent 已暂停（再按 END 恢复）", new Color(0.95f, 0.8f, 0.4f, 1.0f));
-                    CFG.toast.setTimeInView(4000);
-                }
-                report("OK|togglePause");
-                return;
-            }
-            if (inputMode) {
-                if (keycode == 133) {            // INSERT: cancel
-                    inputMode = false;
-                    CFG.toast.setInView("已取消输入", new Color(0.9f, 0.6f, 0.6f, 1.0f));
-                    CFG.toast.setTimeInView(2000);
-                } else if (keycode == 66) {      // ENTER: submit
-                    submitStrategy();
-                } else if (keycode == 67) {      // BACKSPACE
-                    if (inputBuf.length() > 0) inputBuf.deleteCharAt(inputBuf.length() - 1);
-                } else if (keycode == 131) {     // ESCAPE
-                    inputMode = false;
-                    inputBuf.setLength(0);
-                    CFG.toast.setInView("已取消输入", new Color(0.9f, 0.6f, 0.6f, 1.0f));
-                    CFG.toast.setTimeInView(2000);
-                }
-                return;
-            }
-            if (keycode == 133) {        // INSERT: open free-text strategy input
-                inputMode = true;
-                inputBuf.setLength(0);
-                CFG.toast.setInView("战略指令输入: 打字后回车提交（Esc取消）", new Color(0.6f, 0.9f, 1.0f, 1.0f));
-                CFG.toast.setTimeInView(4000);
-            } else if (keycode == 92) {        // PAGE_UP: cycle strategy level
-                strategyLevel = strategyLevel >= STRATEGIES.length ? 1 : strategyLevel + 1;
-                currentStrategy = STRATEGIES[strategyLevel - 1];
-                writeStrategy();
-                CFG.toast.setInView("战略调整 → " + currentStrategy, new Color(0.6f, 0.9f, 1.0f, 1.0f));
-                CFG.toast.setTimeInView(4000);
-                report("OK|strategy|" + strategyLevel);
-            } else if (keycode == 93) {  // PAGE_DOWN: show current 10-turn plan
-                try {
-                    if (planText != null && planText.length() > 0) {
-                        java.util.ArrayList<String> lines = new java.util.ArrayList<String>();
-                        for (String l : planText.split("\n")) {
-                            if (l.length() > 0) lines.add(l);
-                        }
-                        CFG.toast.setInView((java.util.List<String>) lines);
-                        CFG.toast.setTimeInView(9000);
-                        report("OK|planShow|" + lines.size());
-                    } else {
-                        CFG.toast.setInView("计划未生成（Agent 尚未规划）", new Color(0.9f, 0.7f, 0.6f, 1.0f));
-                        CFG.toast.setTimeInView(3000);
-                    }
-                } catch (Throwable t) {
-                    CFG.toast.setInView("计划读取失败", new Color(0.9f, 0.7f, 0.6f, 1.0f));
-                    CFG.toast.setTimeInView(3000);
-                }
-                report("OK|planShow");
-            }
-        } catch (Throwable ignored) {
-        }
-    }
-
-    /** Character input (AoCGame.keyTyped hook). */
-    public static void handleChar(char c) {
-        if (!inputMode) return;
-        try {
-            if (c >= 0x20 && c != 0x7F && inputBuf.length() < 200) {
-                inputBuf.append(c);
-            }
-        } catch (Throwable ignored) {
-        }
-    }
-
-    private static void submitStrategy() {
-        String text = inputBuf.toString().trim();
-        inputMode = false;
-        if (text.isEmpty()) {
-            CFG.toast.setInView("输入为空，保持原战略", new Color(0.9f, 0.6f, 0.6f, 1.0f));
-            CFG.toast.setTimeInView(2500);
-            return;
-        }
-        currentStrategy = text;
-        try {
-            java.io.OutputStreamWriter fw = new java.io.OutputStreamWriter(
-                    new java.io.FileOutputStream("aoc2_strategy.txt"), "UTF-8");
-            fw.write(text);
-            fw.close();
-            CFG.toast.setInView("战略指令已生效: " + text, new Color(0.6f, 0.9f, 1.0f, 1.0f));
-            CFG.toast.setTimeInView(6000);
-            report("OK|strategyManual|" + text);
-        } catch (java.io.IOException e) {
-            CFG.toast.setInView("写入失败", new Color(0.9f, 0.6f, 0.6f, 1.0f));
-            CFG.toast.setTimeInView(2500);
-        }
-    }
-
-    private static void writeStrategy() {
-        try {
-            java.io.OutputStreamWriter fw = new java.io.OutputStreamWriter(
-                    new java.io.FileOutputStream("aoc2_strategy.txt"), "UTF-8");
-            fw.write(STRATEGIES[strategyLevel - 1]);
-            fw.close();
-        } catch (java.io.IOException ignored) {
         }
     }
 
@@ -873,11 +743,6 @@ public class AgentBridge {
             int x = CFG.PADDING * 2;
             int y = 62;                          // below the top info bar
             int lh = (int) (CFG.TEXT_HEIGHT * 1.25f);
-            if (inputMode) {
-                String line = "战略指令: " + inputBuf.toString() + "▌";
-                CFG.drawTextWithShadow(oSB, line, x, y, new Color(0.6f, 0.95f, 0.7f, 1.0f));
-                y += lh;
-            }
             CFG.drawTextWithShadow(oSB, "战略: " + currentStrategy, x, y, gold);
             y += lh;
             if (hudLine1.length() > 0) {
