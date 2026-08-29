@@ -8,6 +8,7 @@ Usage:
 import argparse
 import json
 import os
+import subprocess
 import sys
 import time
 from datetime import datetime
@@ -120,6 +121,7 @@ def read_strategy(game_root: str) -> str:
 
 
 def round_append(session_dir: Path, record: dict):
+    record["agent_build"] = git_build()
     with open(session_dir / "turns.jsonl", "a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
@@ -171,6 +173,24 @@ def set_msg_lines(ctx_store, st) -> str:
 def str_sig(s: str) -> str:
     import hashlib
     return hashlib.md5((s or "").encode("utf-8")).hexdigest()
+
+
+_BUILD_CACHE: dict = {"hash": ""}
+
+
+def git_build() -> str:
+    """Repo commit the running agent was built from（审计版本真相，防误判运行代码）。"""
+    if _BUILD_CACHE["hash"]:
+        return _BUILD_CACHE["hash"]
+    try:
+        out = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+                             cwd=str(REPO), capture_output=True, text=True,
+                             timeout=5, shell=True)
+        h = (out.stdout or "").strip()
+        _BUILD_CACHE["hash"] = h if len(h) >= 7 else "unknown"
+    except Exception:
+        _BUILD_CACHE["hash"] = "unknown"
+    return _BUILD_CACHE["hash"]
 
 
 def _pause_status(game_root: str) -> str:
@@ -301,6 +321,7 @@ def main():
     ctx_store = CtxStore(Path(game_root) / "aoc2_context.json")
 
     provider = create_provider(config)
+    print(f"AGENT BUILD: {git_build()} (每回合 turns.jsonl 亦记录 agent_build)", flush=True)
     print("LLM provider ready")
     try:
         bridge = wait_until_up()

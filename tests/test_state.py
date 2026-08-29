@@ -162,6 +162,12 @@ def test_victory_progress_block_contents(tmp_path):
     assert "省净+2" in line or "净+" in line
 
 
+def test_git_build_returns_commit_ish():
+    from agent.main import git_build
+    h = git_build()
+    assert h and (h == "unknown" or len(h) >= 7)
+
+
 def test_empty_plan_superseded_by_cadence_flow():
     """旧批量计划已由范式切换替代（R006）；该测试验证 cadence 可正常判定节拍而非依赖 plan turns."""
     from agent.mechanics.cadence import CadenceTracker
