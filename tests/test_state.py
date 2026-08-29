@@ -94,3 +94,21 @@ def test_extract_ledger_includes_diplo_and_income():
     assert lg["income"] == {"gold": 90, "move": 40, "diplo": 4, "tech": 3}
     l = ledger_line(lg)
     assert "外交点22" in l and "收金90" in l and "外4" in l
+
+
+def test_extract_ledger_bridge_income_shape():
+    # gateway /state income contract shape (EngineState.java): gold_in/gold_out/balance/diplo_delta
+    st = _sample_state()
+    st["income"] = {"gold_in": 150, "gold_out": 60, "balance": 90, "diplo_delta": 3}
+    lg = extract_ledger(st)
+    assert lg["income"]["gold"] == 90       # net = gold_in - gold_out
+    assert lg["income"]["diplo"] == 3       # diplo_delta
+    assert lg["income"]["move"] is None     # engine does not expose move income
+    l = ledger_line(lg)
+    assert "收金90" in l and "外3" in l and "点?" in l and "技?" in l
+
+
+def test_ledger_line_placeholder_when_gold_missing():
+    lg = {"gold": None, "move_pts": None, "diplo_pts": None, "tech_pts": None, "income": None}
+    l = ledger_line(lg)
+    assert "金?" in l and "行动点?" in l and "外交点?" in l and "科技点?" in l

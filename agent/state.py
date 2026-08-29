@@ -90,9 +90,28 @@ def build_turn_context(state: dict, history: str) -> str:
 
 
 def extract_ledger(st: dict) -> dict:
-    """Resource budget line input (FR-017①): stock + per-turn income (if exposed)."""
+    """Resource budget line input (FR-017①): stock + per-turn income (if exposed).
+
+    T036 alignment: gateway /state income now emits the contract shape
+    {gold_in, gold_out, balance, diplo_delta} (bridge) or the legacy
+    {gold, move, diplo, tech} keys — both are accepted; per-turn gold is the
+    net (gold_in - gold_out), diplo uses diplo_delta.
+    """
     inc = st.get("income") or {}
-    income = {k: inc.get(k) for k in ("gold", "move", "diplo", "tech")} if inc else None
+    income = None
+    if inc:
+        gold = inc.get("gold")
+        if gold is None and ("gold_in" in inc or "gold_out" in inc):
+            try:
+                gold = int(inc.get("gold_in") or 0) - int(inc.get("gold_out") or 0)
+            except (TypeError, ValueError):
+                gold = inc.get("balance")
+        income = {
+            "gold": gold,
+            "move": inc.get("move"),
+            "diplo": inc.get("diplo_delta", inc.get("diplo")),
+            "tech": inc.get("tech"),
+        }
     return {
         "gold": st.get("money"),
         "move_pts": st.get("move_points"),
@@ -102,12 +121,16 @@ def extract_ledger(st: dict) -> dict:
     }
 
 
+def _q(v) -> str:
+    return "?" if v is None or v == "" else str(v)
+
+
 def ledger_line(ledger: dict) -> str:
     inc = ledger.get("income")
     inc_s = ""
     if inc:
         inc_s = ("(收金{}/点{}/外{}/技{}/回合)".format(
-            inc.get("gold", "?"), inc.get("move", "?"), inc.get("diplo", "?"), inc.get("tech", "?")))
+            _q(inc.get("gold")), _q(inc.get("move")), _q(inc.get("diplo")), _q(inc.get("tech"))))
     return "【资源台账】金{} {}行动点{} 外交点{} 科技点{}".format(
-        ledger.get("gold", "?"), inc_s,
-        ledger.get("move_pts", "?"), ledger.get("diplo_pts", "?"), ledger.get("tech_pts", "?"))
+        _q(ledger.get("gold")), inc_s,
+        _q(ledger.get("move_pts")), _q(ledger.get("diplo_pts")), _q(ledger.get("tech_pts")))
