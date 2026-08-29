@@ -90,6 +90,35 @@ def build_turn_context(state: dict, history: str) -> str:
     return f"{l_line}\n{st_line}\n{provs_ctx}\n历史:\n{history}"
 
 
+RISK_RATIO = 1.2
+
+
+def threat_scan(st: dict) -> dict | None:
+    """War-risk scan (2026-08-29 user feedback: agent got wiped out).
+
+    A hostile (negative relation or already warring) neighbor whose army
+    exceeds ours by RISK_RATIO is a pre-emptive window: act (declare war /
+    stabilize relations), never turtle.
+    """
+    try:
+        me = int(st.get("units") or 0)
+    except (TypeError, ValueError):
+        return None
+    if me <= 0:
+        return None
+    for n in st.get("neighbors", []):
+        try:
+            un = int(n.get("units") or 0)
+        except (TypeError, ValueError):
+            continue
+        rel = n.get("relation") or 0
+        hostile = bool(n.get("war")) or (isinstance(rel, (int, float)) and rel < 0)
+        if un >= me * RISK_RATIO and hostile:
+            return {"civ_id": n.get("civ_id"), "units": un, "mine": me,
+                    "ratio": round(un / me, 2), "war": bool(n.get("war"))}
+    return None
+
+
 def extract_ledger(st: dict) -> dict:
     """Resource budget line input (FR-017①): stock + per-turn income (if exposed).
 

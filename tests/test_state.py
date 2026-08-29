@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from agent.state import (build_history, format_state_line, extract_ledger, ledger_line)
+from agent.state import (build_history, format_state_line, extract_ledger, ledger_line, threat_scan, RISK_RATIO)
 
 
 def _sample_state():
@@ -112,3 +112,29 @@ def test_ledger_line_placeholder_when_gold_missing():
     lg = {"gold": None, "move_pts": None, "diplo_pts": None, "tech_pts": None, "income": None}
     l = ledger_line(lg)
     assert "金?" in l and "行动点?" in l and "外交点?" in l and "科技点?" in l
+
+
+def test_threat_scan_flags_hostile_overtake():
+    st = _sample_state()
+    st["units"] = 100
+    st["neighbors"] = [{"civ_id": 55, "units": 500, "relation": -50, "war": False}]
+    thr = threat_scan(st)
+    assert thr and thr["civ_id"] == 55 and thr["ratio"] >= RISK_RATIO and not thr["war"]
+
+
+def test_threat_scan_ignores_friendly_and_small():
+    st = _sample_state()
+    st["units"] = 100
+    st["neighbors"] = [
+        {"civ_id": 55, "units": 500, "relation": 30, "war": False},   # friendly big -> ignore
+        {"civ_id": 56, "units": 90, "relation": -80, "war": False},   # small hostile -> ignore
+    ]
+    assert threat_scan(st) is None
+
+
+def test_threat_scan_war_flag_override():
+    st = _sample_state()
+    st["units"] = 100
+    st["neighbors"] = [{"civ_id": 55, "units": 300, "relation": 5, "war": True}]
+    thr = threat_scan(st)
+    assert thr and thr["war"] is True

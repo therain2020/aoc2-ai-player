@@ -24,7 +24,9 @@ from agent.actions import (  # noqa: E402
 from agent.bridge_client import wait_until_up, BridgeError  # noqa: E402
 from agent.llm import create_provider  # noqa: E402
 from agent.llm.base import LLMError  # noqa: E402
-from agent.state import build_history, build_turn_context, extract_ledger, ledger_line  # noqa: E402
+from agent.state import (  # noqa: E402
+    build_history, build_turn_context, extract_ledger, ledger_line, threat_scan,
+)
 from agent.mechanics import phases as mech_phases  # noqa: E402
 from agent.mechanics import prompts as mech_prompts  # noqa: E402
 from agent.messages import (  # noqa: E402
@@ -441,11 +443,16 @@ def main():
                 plan = None
                 strategy_sig = s_sig
 
-            # emergency check: territory lost while executing a plan
+            # emergency checks: territory lost OR hostile army overtakes mine
+            thr = threat_scan(st)
             if plan is not None:
                 base_prov = plan.get("base_provinces", 0)
                 if cur > planned_turn and st.get("provinces", 0) < base_prov:
                     print(f"EMERGENCY: provinces {base_prov} -> {st.get('provinces')}, re-planning", flush=True)
+                    plan = None
+                if thr:
+                    print(f"DANGER: civ{thr['civ_id']} units {thr['units']} >= {thr['ratio']}x mine -> re-plan",
+                          flush=True)
                     plan = None
 
             if plan is None:
@@ -455,9 +462,16 @@ def main():
                     break
                 history = build_history(session_dir)
                 ctx = build_turn_context(st, history)
+                danger_note = ""
+                if thr:
+                    danger_note = (f"【危险信号】邻国 civ{thr['civ_id']} 军力 = 我方×{thr['ratio']}"
+                                   f"（{thr['units']} vs {thr['mine']}）"
+                                   f"{'，已交战' if thr['war'] else '，关系为敌'}——"
+                                   "先发制人或送礼维稳，禁止躺平发展/缓慢备战。\n")
                 if strat:
                     ctx = f"【用户战略指示】{strat}\n" + ctx
                 ctx = (f"{ledger_line(ledger)}\n{mech_prompts.budget_guard(ledger)}\n{phase_note}\n"
+                       + danger_note
                        + set_msg_lines(ctx_store, st)
                        + ctx
                        + mech_prompts.plan_turn_closing(cur))

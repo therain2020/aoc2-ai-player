@@ -52,6 +52,13 @@ def test_plan_spec_has_budget_and_principles():
     assert "封顶" in spec
 
 
+def test_plan_spec_has_threat_and_opportunism_tactics():
+    spec = prompts.plan_batch_spec()
+    assert "先发制人" in spec          # hostile overtake -> pre-emptive response
+    assert "渔翁得利" in spec          # FR-017③ baseline tactic present
+    assert "强邻关系维持" in spec
+
+
 def test_budget_guard_low_gold_blocks_gold_actions():
     guard = prompts.budget_guard({"gold": -90, "income": {"gold": -3, "diplo": 8}})
     assert "预算护栏" in guard and "禁止一切金币动作" in guard
