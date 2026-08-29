@@ -75,3 +75,15 @@ LLM 连续失败(重试1次) → SKIP_TURN(确定性动作+推进+FAIL标记)   
 
 每回合事件流（决策/回执/战争开始/和谈/同化结束/胜负）+ 资源台账（≤2s 轮询）；
 指挥控件：strategy_text / gear(1-6) / paused（持久化 aoc2_strategy.txt + 暂停文件，机制同旧热键）。
+
+## 8. 范式切换实体（2026-08-29 clarify——愿景 + 逐回合自主决策）
+
+| 实体 | 字段 | 说明 |
+|---|---|---|
+| VisionPlan | brief(≤120字 / 10回合方向) / base_turn / generated_turn / trigger | FR-008 修订：仅文字愿景，无回合动作；重生成触发=领土损失/战略sig/决策类消息/10回合到期 |
+| TurnDecision | turn / source(llm\|suggestion) / actions[] / reserve_after / cadence | 每回合自主决策（每 2 回合常规；事件触发立即；战争期每回合 FR-009） |
+| ReservePolicy | gold_floor = max(0, 3×per_turn_net_income) / military_line = 1.2×提示/1.5×强制 | FR-017⑤ 动态储备；SC-011 判定 |
+| DecisionContext | 白名单精简（FR-018）：ledger / 资源速查摘要 / 胜利进展压缩行 / 危险信号 / 前线评分 / 战术建议 / 常驻关系与历史追加行 | ≤6000 token；禁止叙事性铺陈 |
+
+决策状态机：`INPUT_ORDERS → cadence_check(state_diff) → [决策|复用上次] → execute → reserve_guard(击穿→修复优先) → endTurn`；
+`cadence=2 回合（常规）∪ 关键事件（wars 转变/领土损失/决策消息/战略变化/愿景到期）`。

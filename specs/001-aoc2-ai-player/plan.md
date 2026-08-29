@@ -32,7 +32,7 @@
 
 **Project Type**: 桌面游戏自动化 + 数据管线 + 可视化；dashboard/timeline 为原生 HTML 单文件
 
-**Performance Goals**: 决策调用 <5s（conservative 3.8s 基线）；10 回合 ≤1 调用（SC-001）；输出 token ≤1500（SC-005）；dashboard 刷新 ≤2s（US1 验收 3）
+**Performance Goals**: 决策调用 <5s（conservative 3.8s 基线）；无突发 10 回合决策调用 ≤6（SC-001 新口径：每 2 回合常规 + 愿景再生 1 次；战争期按 FR-009 每回合）；每次输出 token ≤1500、**决策上下文输入 ≤6000 token**（SC-005 + FR-018 精炼）；dashboard 刷新 ≤2s（US1 验收 3）
 
 **Constraints**: 宪法 VII——机制层每条结论必须源码/真机验证；FR-002 边界——禁数值直改；SC-006——仅新增桥接类、引擎核心类禁止改动；启动参数变更需主面板一键（start_game.bat 扩展）
 
@@ -44,7 +44,7 @@
 
 - [x] **I 引擎直调**——EngineGateway 即引擎 API 直调层；无模拟键鼠（比 ASM 更纯粹）
 - [x] **II 旁观零冲突**——Agent 不占键鼠；视图保护（FR-007）与上帝视角保留；tick 消费策略不变
-- [x] **III 成本纪律**——模型/参数/追加式历史不变；机制层不增加调用次数（仍在批量计划与 WAR 分支内）
+- [x] **III 成本纪律**——模型/参数/追加式历史不变；2026-08-29 范式切换后调用节奏按 SC-001 度量化（无突发 10 回合 ≤6 次；输入侧以 FR-018 精炼约束 ≤6000 token，成本与自决平衡经用户明示（clarify C））
 - [x] **IV 沉浸式体验**——宪法已按 2026-08-29 决议修订：dashboard 主入口 + HUD 只读；本计划在此范围内设计，无新增违脉
 - [x] **V 单实例受控生命周期**——panel 启停、pid 防重、in_game gate 全部保留
 - [x] **VI 数据完备**——turns.jsonl 增补：resource ledger（金/行动力/外交点/收入）与机制阶段标注
@@ -106,9 +106,11 @@ tests/                               # 【新增】pytest
 
 ### Phase 1: 设计（产出 data-model.md / contracts/ / quickstart.md）
 
-6. 实体与状态机（agent 主循环：认知 → 机制阶段识别 → 战术 → 序列 → 执行 → 记录）。
+6. 实体与状态机（agent 主循环：认知 → 机制阶段识别 → **愿景(文字) + 逐回合决策** → 执行 → 记录）。
 7. EngineGateway REST 契约 + dashboard 命令契约（与 L1 全集双向一致）。
 8. quickstart 真机验收路径（含机制场景：同化窗口触发、渔翁得利动作序列、和平条约落地）。
+8b. **范式切换设计（2026-08-29 clarify）**：TurnDecision/VisionPlan/ReservePolicy/Cadence 实体
+   （见 data-model.md §7）；决策上下文精炼契约（FR-018 关键字段白名单）；SC-011 验收口径。
 
 ### Phase 2: 实现（tasks.md 拆解，顺序为依赖序）
 
