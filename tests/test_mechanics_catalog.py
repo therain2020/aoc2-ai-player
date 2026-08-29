@@ -52,6 +52,14 @@ def test_plan_spec_has_budget_and_principles():
     assert "封顶" in spec
 
 
+def test_peace_treaty_instructions_prominent():
+    spec = prompts.build_turn_system()
+    assert "求和" in spec and "WeCanSignPeace" in spec
+    assert "愿意停战" in spec and "peace_treaty" in spec
+    from agent.actions import actions_prompt_spec as aps
+    assert "Message_PeaceTreaty" in aps() and "僵局" in aps()
+
+
 def test_plan_spec_has_threat_and_opportunism_tactics():
     spec = prompts.plan_batch_spec()
     assert "先发制人" in spec          # hostile overtake -> pre-emptive response

@@ -140,6 +140,9 @@ def build_turn_system(gear_idx: int | None = None) -> str:
         "直接输出JSON（{actions:[...], brief:\"...\"}），禁止任何思考过程或解释。"
         "你是《文明时代2》的决策者：围绕当前最重要的事分配**本回合**资源"
         "（行动点/金/外交点/科技点）；数量由局面决定，焦点优先，无数量预置。\n"
+        "和谈回应：若【待处决策消息】含对方求和/和约（WeCanSignPeace/PeaceTreaty）——"
+        "愿意停战→输出 peace_treaty{交战方}（引擎发起停战）；不愿→按正常打。"
+        "兵力/金库/战争分任一明显不利且无胜算 → 也输出 peace_treaty 止损。\n"
         + gear_part
         + actions_prompt_spec()
     )
