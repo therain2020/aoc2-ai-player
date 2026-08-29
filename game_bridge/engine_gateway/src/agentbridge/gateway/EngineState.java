@@ -470,6 +470,38 @@ final class EngineState {
                   .append("}");
             } catch (Throwable ignored) {
             }
+            // contract extras — adjacency for MY provinces (agent battlefield
+            // view: which of my provinces touch which enemy provinces — move
+            // legality & gather targets, 2026-08-29 user requirement)
+            try {
+                StringBuilder adj = new StringBuilder("[");
+                boolean firstAdj = true;
+                for (int pidA2 = 0; pidA2 < provincialSize; ++pidA2) {
+                    Object provA2 = EngineApi.call(game(), "getProvince", pidA2);
+                    if (((Integer) EngineApi.call(provA2, "getCivID")).intValue() != me) {
+                        continue;
+                    }
+                    int nbSizeA = ((Integer) EngineApi.call(provA2, "getNeighboringProvincesSize")).intValue();
+                    for (int ja = 0; ja < nbSizeA; ++ja) {
+                        int npa = ((Integer) EngineApi.call(provA2, "getNeighboringProvinces", ja)).intValue();
+                        try {
+                            int nca = ((Integer) EngineApi.call(
+                                    EngineApi.call(game(), "getProvince", npa), "getCivID")).intValue();
+                            if (!firstAdj) {
+                                adj.append(',');
+                            }
+                            firstAdj = false;
+                            adj.append("{\"mine\":").append(pidA2)
+                               .append(",\"nbr\":").append(npa)
+                               .append(",\"civ\":").append(nca).append("}");
+                        } catch (Throwable ignoredNb) {
+                        }
+                    }
+                }
+                adj.append("]");
+                sb.append(",\"adjacency\":").append(adj);
+            } catch (Throwable ignored) {
+            }
             // contract extras — armies overview: EVERY province with MY army >0
             // (user fix 2026-08-29: getArmyCivID is the safe per-civ reader —
             // shows where my garrisons actually are, not just front pairs)

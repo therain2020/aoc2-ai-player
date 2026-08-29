@@ -12,6 +12,24 @@ COUNT_MULT = 4         # 进攻兵数 = 敌兵 × 4
 MOBILIZE = 500
 
 
+def _front_garrison(prov: int, st: dict) -> int:
+    """My garrison at province (from armies_overview; default 0)."""
+    for a in st.get("armies_overview") or []:
+        if int(a.get("prov") or -1) == prov:
+            return int(a.get("army") or 0)
+    return 0
+
+
+def _recruit_target(st: dict) -> list[int]:
+    """War deployment: recruit AT the front provinces missing garrison —
+    the direct way to put soldiers on the border (no adjacency needed)."""
+    froms = [int(f.get("from")) for f in (st.get("front_lines") or [])]
+    weak = [p for p in froms if _front_garrison(p, st) < 50]
+    if weak:
+        return weak[:2]
+    return weak[:1] or [int((st.get("my_provinces") or [0])[0])]
+
+
 def plan_war_turn(st: dict) -> list[dict]:
     orders: list[dict] = []
     fronts = st.get("front_lines") or []
@@ -49,12 +67,12 @@ def plan_war_turn(st: dict) -> list[dict]:
                            "to_province": int(o["to"]),
                            "count": max(int(omy * 0.8), MOVE_MIN)})
 
-    # ③ 动员：批次由行动点动态决定（12 点/批），不设固定数量
+    # ③ 动员：直接征在缺兵前线省（部署正道——兵即在前线；不绕集结）
     if move_pts >= 8:
-        n_recruit = min(max(1, move_pts // 12), len(provs))
-        for i in range(n_recruit):
+        targets = _recruit_target(st)
+        for p in targets[:2]:
             orders.append({"action": "recruit_army",
-                           "province_id": int(provs[i]), "count": MOBILIZE})
+                           "province_id": p, "count": MOBILIZE})
     return orders
 
 

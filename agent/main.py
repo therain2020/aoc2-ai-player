@@ -520,6 +520,7 @@ def main():
                     ctx2 = f"【用户战略指示】{strat2}\n" + ctx2
                 ctx2 = (f"{ledger_line(ledger)}\n{mech_prompts.budget_guard(ledger)}\n{phase_note}\n"
                         + set_msg_lines(ctx_store, st)
+                        + state_mod.battle_view(st) + "\n"
                         + victory_progress(st, session_dir) + "\n"
                         + ctx2
                         + "\n" + assessment
@@ -654,6 +655,7 @@ def main():
             primary = (f"{ledger_line(ledger)}\n{mech_prompts.budget_guard(ledger)}\n{phase_note}\n"
                        + danger_note + reserve_note + "\n" + vision_line
                        + set_msg_lines(ctx_store, st)
+                       + state_mod.battle_view(st) + "\n"
                        + victory_progress(st, session_dir) + "\n")
             est = state_mod.ctx_token_estimate(primary)
             hist_limit = max(4, (state_mod.CTX_TOKEN_BUDGET - est) // 45)

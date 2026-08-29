@@ -196,6 +196,44 @@ def civ_big(n: dict) -> int:
     return n.get("civ_id") or -1
 
 
+def battle_view(st: dict) -> str:
+    """Agent-readable battlefield graph (user: the map is FOR THE AGENT).
+
+    Combines /state adjacency + armies_overview + front_lines into a compact
+    text map: my garrisons per province, move-legal edges (mine↔mine and
+    mine↔enemy), front-line pressure. The agent sees WHO touches WHOM and
+    WHERE the armies are — then decides gather/attack itself.
+    """
+    parts = []
+    armies = {int(a.get("prov")): int(a.get("army") or 0)
+              for a in (st.get("armies_overview") or [])}
+    g = " ".join(f"{p}({n})" for p, n in sorted(armies.items()))
+    parts.append(f"【战场图】我方驻军: {g or '无'}")
+    # move-legal edges
+    my_edges = []
+    enemy_edges = []
+    for a in st.get("adjacency") or []:
+        if int(a.get("civ") or 0) == int(st.get("my_civ", -1)):
+            my_edges.append((int(a["mine"]), int(a["nbr"])))
+        else:
+            enemy_edges.append((int(a["mine"]), int(a["nbr"]), int(a.get("civ") or -1)))
+    if my_edges:
+        parts.append("可调动(我方邻接): " + ", ".join(f"{a}↔{b}" for a, b in my_edges[:30]))
+    if enemy_edges:
+        parts.append("可进攻(对敌边境): " + ", ".join(
+            f"{a}→{b}(civ{c})" for a, b, c in enemy_edges[:24]))
+    # front pressure (< 50 my units at a front province => breach risk)
+    weak = []
+    for f in st.get("front_lines") or []:
+        frm = int(f.get("from"))
+        my_n = armies.get(frm, 0)
+        if my_n < 50:
+            weak.append(f"{frm}(我{my_n})")
+    if weak:
+        parts.append("告急走廊(我<50兵): " + ", ".join(weak[:12]) + " —— 优先在此征兵/驻防")
+    return "\n".join(parts)
+
+
 # FR-018: DecisionContext budget — 单次决策上下文 ≤6000 token（量级估算：中文≈字符/2）
 CTX_TOKEN_BUDGET = 6000
 

@@ -170,6 +170,20 @@ def test_empty_plan_superseded_by_cadence_flow():
     assert c.should_decide(3, {"provinces": 10, "wars": [], "messages": 0, "msg_types": ""})[0] is True
 
 
+def test_battle_view_agent_graph():
+    from agent.state import battle_view
+    st = _sample_state()
+    st["my_civ"] = 4
+    st["armies_overview"] = [{"prov": 241, "army": 300}, {"prov": 242, "army": 100}]
+    st["adjacency"] = [{"mine": 241, "nbr": 242, "civ": 4},
+                       {"mine": 241, "nbr": 300, "civ": 55},
+                       {"mine": 242, "nbr": 301, "civ": 55}]
+    st["front_lines"] = [{"from": 241, "to": 300, "civ": 55, "my_units": 10, "enemy_units": 80}]
+    view = battle_view(st)
+    for token in ("【战场图】", "241(300)", "可调动", "可进攻", "告急走廊241"):
+        assert token in view, token
+
+
 def test_victory_progress_budget_sliders():
     from agent.state import victory_progress
     st = _sample_state()
