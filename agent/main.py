@@ -31,6 +31,7 @@ from agent.state import (  # noqa: E402
 from agent.mechanics import gears as mech_gears  # noqa: E402
 from agent.mechanics import intent_writer  # noqa: E402
 from agent.mechanics import value_normalizer  # noqa: E402
+from agent.mechanics import war_planner  # noqa: E402
 from agent.mechanics import phases as mech_phases  # noqa: E402
 from agent.mechanics import prompts as mech_prompts  # noqa: E402
 from agent.messages import (  # noqa: E402
@@ -364,6 +365,7 @@ def main():
     prev_provinces = 0
     fail_streak = 0
     last_danger_replan = -99
+    last_war_strategic = -99
 
     def record_skip(cur, phase, ledger, reason) -> None:
         """T043: LLM 失败/输出无效兜底——SKIP_TURN 确定性推进 + FAIL 标记；
@@ -467,61 +469,66 @@ def main():
                 if last_war_turn == cur:
                     time.sleep(5)
                     continue
-                print(f"WAR TURN {cur}: single-call war decision", flush=True)
+                print(f"WAR TURN {cur}: tactical orders (rule-driven blitz)", flush=True)
                 war_trk.on_turn(cur)
                 stale = war_trk.stalemate_flags(cur)
-                assessment = front_assessment(st.get("front_lines", []), stale, st)
-                history = build_history(session_dir)
-                ctx = build_turn_context(st, history)
-                strat = read_strategy(game_root)
-                if strat:
-                    ctx = f"【用户战略指示】{strat}\n" + ctx
-                ctx = (f"{ledger_line(ledger)}\n{mech_prompts.budget_guard(ledger)}\n{phase_note}\n"
-                       + set_msg_lines(ctx_store, st)
-                       + victory_progress(st, session_dir) + "\n"
-                       + ctx
-                       + "\n" + assessment
-                       + mech_prompts.war_turn_closing())
-                try:
-                    raw = chat_with_fallback(provider, WAR_SYSTEM_PROMPT, ctx)
-                except LLMError as e:
-                    record_skip(cur, phase, ledger, f"war llm: {e}")
-                    continue
-                try:
-                    war_actions = parse_actions(raw)
-                except (ActionError, json.JSONDecodeError) as e:
-                    print(f"war action invalid ({e}), retrying once", flush=True)
-                    try:
-                        war_actions = parse_actions(chat_with_fallback(
-                            provider, WAR_SYSTEM_PROMPT, ctx, "上次输出不合法，请严格按格式输出。"))
-                    except (ActionError, json.JSONDecodeError, LLMError) as e2:
-                        record_skip(cur, phase, ledger, f"war invalid x2: {e2}")
+                # 僵局 -> 规则化和谈止损（不依赖 LLM）
+                if stale:
+                    target = None
+                    for n in st.get("neighbors", []):
+                        if n.get("war"):
+                            target = n.get("civ_id")
+                            break
+                    if target is not None:
+                        r = bridge.peace_treaty(target)
+                        print(f"  stalemate -> peace_treaty(civ{target}): {str(r)[:80]}", flush=True)
+                        round_append(session_dir, {
+                            "turn": cur, "ts": time.time(), "type": "war",
+                            "mechanic_phase": phase.phase_id, "tactic_ref": phase.tactic_ref,
+                            "ledger": ledger, "decision": [{"action": "peace_treaty",
+                                                            "target_civ_id": target}],
+                            "results": [{"action": "peace_treaty", "result": r}],
+                            "brief": "僵局止损和谈",
+                            "tokens": dict(provider.last_usage), "tokens_cum": dict(provider.total),
+                        })
+                        last_war_turn = cur
+                        bridge.end_turn()
+                        time.sleep(4)
                         continue
-                fail_streak = 0
+                war_actions = war_planner.plan_war_turn(st)
                 if not war_actions:
-                    # war branch guard: an empty war decision must NOT go idle —
-                    # mobilize instead (fill with a scaled recruit)
                     provs = st.get("my_provinces") or [0]
                     war_actions = [{"action": "recruit_army", "province_id": int(provs[0]),
                                     "count": 500}]
-                    print("  war empty decision -> auto-mobilize recruit(500)", flush=True)
+                    print("  war planner empty -> mobilize", flush=True)
                 war_actions = value_normalizer.normalize_values(war_actions, st)
                 results = execute(bridge, war_actions)
                 war_trk.note_results(cur, results, prev_provinces, st.get("provinces", 0))
                 prev_provinces = st.get("provinces", 0)
                 ok_n = sum(1 for r in results if result_ok(r["result"]))
-                print(f"  war actions {ok_n}/{len(results)} ok: "
+                print(f"  war orders {ok_n}/{len(results)} ok: "
                       f"{[r['action'] for r in results]}", flush=True)
-                bridge.toast(f"[战争回合{cur}] 已执行 {ok_n}/{len(results)}")
+                bridge.toast(f"[战争回合{cur}] 执行 {ok_n}/{len(results)}")
                 round_append(session_dir, {
                     "turn": cur, "ts": time.time(), "type": "war",
                     "state": {k: st.get(k) for k in ("turn", "money", "provinces", "units")},
                     "mechanic_phase": phase.phase_id, "tactic_ref": phase.tactic_ref,
                     "ledger": ledger,
                     "decision": war_actions, "results": results,
-                    "brief": "战争回合决策",
+                    "brief": "战争规则订单(闪击战术)",
                     "tokens": dict(provider.last_usage), "tokens_cum": dict(provider.total),
                 })
+                # 每 5 回合 LLM 战略周报（只读摘要，指挥方向参考）
+                if cur - last_war_strategic >= 5:
+                    last_war_strategic = cur
+                    try:
+                        ctx = build_turn_context(st, build_history(session_dir))
+                        raw = provider.chat(WAR_SYSTEM_PROMPT,
+                                             ctx + "\n仅给出战略洞察（主攻方向/是否求和/兵力分配），短评，不输出动作：",
+                                             temperature=0.3, max_tokens=1200)
+                        print(f"  war strategy note: {raw[:130]}", flush=True)
+                    except Exception:
+                        pass
                 last_war_turn = cur
                 bridge.end_turn()
                 time.sleep(4)

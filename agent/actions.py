@@ -257,7 +257,8 @@ def _validate_actions(raw_actions: list) -> list:
 def actions_prompt_spec() -> str:
     """Describe the action space for the LLM system prompt."""
     return (
-        "输出 JSON {actions:[...], brief:\"...\"}。动作（每回合 1-3 个）：\n"
+        "输出 JSON {actions:[...], brief:\"...\"}。动作数量不限（超级大脑：每回合可 10-30 条，"
+        "按资源预算/行动点排序消耗；引擎按行动点与金库自然限量，FAIL 条目记录不影响其余）：\n"
         "declare_war{target_civ_id} 宣战 | recruit_army{province_id,count} 征兵 | "
         "move_army{from_province,to_province,count} 移军(须相邻) | "
         "invest{province_id,gold} 金币投资经济 | invest_dev{province_id,gold} 投资发展(需行动点≥8) |\n"
