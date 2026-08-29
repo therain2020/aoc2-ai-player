@@ -257,7 +257,8 @@ def _validate_actions(raw_actions: list) -> list:
 #: 资源消耗与影响速查（引擎签名核实，docs/mechanics.md L1）——给 LLM 的"经济账"
 RESOURCE_ECONOMICS = """【资源消耗速查】（点=外交点；行动点=每回合 set 值；每动作依库内限制取舍）
 - declare_war: 无点扣，真实代价=侵略等级↑+全球关系-35+军费升
-- recruit_army: 行动点（每省一批扣一次 COST_OF_RECRUIT）+ 金/兵；批量越大越划算
+- recruit_army: 行动点（每省一批扣一次 COST_OF_RECRUIT）+ 金/兵；批量越大越划算；**禁止占领省**
+  （省 civID==真主 才可征兵；被占省（getCivID≠getTrueOwnerOfProvince）一律 FAIL，勿选）
 - move_army: 行动点（每支部队）；影响=移动+邻敌触发战斗
 - invest: 行动点≥12 + 金 → 省 4 回合经济收益（上限随省经济）
 - invest_dev: 行动点≥8 + 金 → 省发展

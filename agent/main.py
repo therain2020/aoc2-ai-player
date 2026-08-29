@@ -361,6 +361,7 @@ def main():
     cadence = mech_cadence.CadenceTracker()
     vision = None
     war_llm_fail_streak = 0
+    fail_recruit_provs: list[int] = []
     last_war_fallback_turn = -99
 
     def record_skip(cur, phase, ledger, reason) -> None:
@@ -652,7 +653,7 @@ def main():
                     war_actions = suggestion or [{"action": "recruit_army",
                                                   "province_id": int((st.get("my_provinces") or [0])[0]),
                                                   "count": 500}]
-                war_actions = mech_sanitize.sanitize_actions(war_actions, st)
+                war_actions = mech_sanitize.sanitize_actions(war_actions, st, fail_recruit_provs)
                 war_actions = value_normalizer.normalize_values(war_actions, st)
                 results = execute(bridge, war_actions)
                 war_trk.note_results(cur, results, prev_provinces, st.get("provinces", 0))
@@ -790,9 +791,15 @@ def main():
                                                     st, thr)
             if injected:
                 print(f"  intent-added: {', '.join(injected)}", flush=True)
-            actions = mech_sanitize.sanitize_actions(actions, st)
+            actions = mech_sanitize.sanitize_actions(actions, st, fail_recruit_provs)
             actions = value_normalizer.normalize_values(actions, st)
             results = execute(bridge, actions)
+            for r in results:
+                if r.get("action") == "recruit_army" and not result_ok(r.get("result")):
+                    pid = (r.get("params") or {}).get("province_id")
+                    if pid is not None and int(pid) not in fail_recruit_provs:
+                        fail_recruit_provs.append(int(pid))
+                        print(f"  recruit FAIL@省{pid} -> 加入失败黑名单（下轮禁选）", flush=True)
             ok_n = sum(1 for r in results if result_ok(r["result"]))
             print(f"  executed {ok_n}/{len(results)} ok ({src})", flush=True)
             balance = provider.fetch_balance() if getattr(provider, "track_balance", False) else None

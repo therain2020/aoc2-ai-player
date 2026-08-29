@@ -12,9 +12,12 @@ Everything else passes through.
 from __future__ import annotations
 
 
-def sanitize_actions(actions: list[dict], st: dict) -> list[dict]:
+def sanitize_actions(actions: list[dict], st: dict, fail_provinces=()) -> list[dict]:
     if not isinstance(actions, list):
         return []
+    # 被占省（true_owner≠我，引擎禁征兵/投资）+ 已失败省（失败反馈闭环）
+    occupied = {int(x.get("prov")) for x in (st.get("occupied_by_me") or [])} | set(
+        int(p) for p in (fail_provinces or []))
     fronts: dict[tuple[int, int], int] = {}
     for f in st.get("front_lines") or []:
         try:
@@ -53,6 +56,8 @@ def sanitize_actions(actions: list[dict], st: dict) -> list[dict]:
         elif n == "recruit_army":
             if broke or recruits >= 2:         # 破产禁募 / 每回合至多 2 批
                 continue
+            if int(a.get("province_id") or -1) in occupied:
+                continue                        # 被占/失败恢复省不再征兵（引擎也会拒）
             recruits += 1
             out.append(a)
         else:

@@ -502,6 +502,30 @@ final class EngineState {
                 sb.append(",\"adjacency\":").append(adj);
             } catch (Throwable ignored) {
             }
+            // contract extras — occupied/true-owner per MY province (recruit &
+            // invest 前置：被占省一律失败——把占领状态暴露给 Agent, 2026-08-29)
+            try {
+                StringBuilder occ = new StringBuilder("[");
+                boolean firstOcc = true;
+                for (int pidO = 0; pidO < provincialSize; ++pidO) {
+                    Object provO = EngineApi.call(game(), "getProvince", pidO);
+                    if (((Integer) EngineApi.call(provO, "getCivID")).intValue() != me) {
+                        continue;
+                    }
+                    int to = ((Integer) EngineApi.call(provO, "getTrueOwnerOfProvince")).intValue();
+                    if (to == me) {
+                        continue;    // 只列被占省（控制权在我但真主非我）
+                    }
+                    if (!firstOcc) {
+                        occ.append(',');
+                    }
+                    firstOcc = false;
+                    occ.append("{\"prov\":").append(pidO).append(",\"true_owner\":").append(to).append("}");
+                }
+                occ.append("]");
+                sb.append(",\"occupied_by_me\":").append(occ);
+            } catch (Throwable ignored) {
+            }
             // contract extras — armies overview: EVERY province with MY army >0
             // (user fix 2026-08-29: getArmyCivID is the safe per-civ reader —
             // shows where my garrisons actually are, not just front pairs)
