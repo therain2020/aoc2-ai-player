@@ -42,6 +42,20 @@
 `toast`(`CFG.toast.setInView`)、`hud`、`plan`(PageDown 内存通道)、`enterGodView`(`CFG.FOG_OF_WAR=0`)、
 `loadGame`/`newGame`(幂等守卫，START 自动 done)。
 
+## 资源成本标签（COST_TAGS，FR-017① 五分类）
+
+> 机械校验源 = `agent/actions.py :: COST_TAGS`（SC-010 零遗漏守卫：
+> `tests/test_actions.py::test_cost_tags_zero_miss`）；具体点耗/冷却数值见上文各动作内联说明。
+
+| 分类 | 含义 | 动作 |
+|---|---|---|
+| `gold` | 金币 | invest / invest_dev / move_capital |
+| `move` | 行动点 | recruit_army / move_army / disband_army / prepare_for_war |
+| `diplo` | 外交点 | offer_alliance / peace_treaty / send_insult / trade_request / nonaggression_pact / offer_vasalization / military_access_ask / military_access_give / improve_relations / decrease_relations / ultimatum / civilize / form_civilization / proclaim_independence / call_to_arms |
+| `multi` | 多资源 | declare_war / construct / send_gift / support_rebels |
+| `tech` | 科技点 | invest_tech |
+| `query` | 零成本查询 | （Agent 侧不使用，桥 /state 等为单独入口） |
+
 ## 科技点 8 类目
 
 pop_growth(人口) / eco_growth(经济) / taxation(税收) / production(生产) / administration(行政) /

@@ -27,9 +27,11 @@
 - `TS/TURN/<id>_C_<n>` —— 每回合省份易主事件
 
 `game_bridge/SaveDump`（Java，运行于游戏自带 JRE）把存档反序列化为 JSON，
-供离线回放与数据归档；**Agent 的实时操作通过 AgentBridge（javaagent 注入）
-直调游戏引擎 API**（宣战/征兵/移动/投资/结束回合），不占用键鼠——旁观者可自由
-点击地图查看信息。
+供离线回放与数据归档；**Agent 的实时操作通过 EngineGateway（源码级桥，javaagent
+运行时附加）直调游戏引擎 API**——动作空间 = 玩家等价全集 30 动作（军事/内政/
+外交/科技/建造，含和谈/同化/殖民），并按「机制层」（`agent/mechanics/`，9 条
+源码验证机制如战争循环/同化窗口/安内门）引导逐回合决策——不占用键鼠，旁观者可
+自由点击地图查看信息。
 
 ```
 AgentBridge(引擎 API 直调) ← /state、/action ← LLM 决策循环
