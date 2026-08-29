@@ -17,6 +17,9 @@ logs/
 # ad-hoc diagnostic scripts (scratch)
 scripts/_*.py
 
+# generated timeline page
+/timeline.html
+
 # Java build output + extracted game jar (local only)
 game_bridge/build/
 game_bridge/*.class
