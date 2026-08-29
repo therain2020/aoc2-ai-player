@@ -3,14 +3,19 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+.pytest_cache/
 
 # Config with secrets
 config.yaml
 config.local.yaml
 
-# Session data
+# Session data / runtime logs
 sessions/
 screenshots/
+logs/
+
+# ad-hoc diagnostic scripts (scratch)
+scripts/_*.py
 
 # Java build output + extracted game jar (local only)
 game_bridge/build/
@@ -18,6 +23,15 @@ game_bridge/*.class
 game_bridge/aoc2.jar
 .bridge/
 game_bridge/agent_bridge/build/
+
+# EngineGateway (source-level bridge): build output + local decompile refresh
+game_bridge/engine_gateway/build/
+game_bridge/engine_gateway/analysis/
+game_bridge/engine_gateway/*.jar
+
+# Legacy ASM bridge archive (read-only reference copy; jar stays local)
+game_bridge/legacy_agent_bridge/agent-bridge.jar
+game_bridge/legacy_agent_bridge/build/
 
 # OS
 Thumbs.db
