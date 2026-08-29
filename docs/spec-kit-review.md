@@ -32,3 +32,15 @@
 - T103/T104：30 回合冒烟 + SC-001~005 打卡（需游戏窗口；turns.jsonl 证据采集）
 - 审视方法学注释：`specify init --here --force --non-interactive --integration claude`
   初始化；工作流与 skills 见 `.specify/`、`.claude/skills/speckit-*/`。
+
+## 复审（2026-08-29 重构后，T053 轻量过检）
+
+| 三件套/检查面 | 状态 |
+|---|---|
+| spec.md | ✅ 与现状一致（FR-003 补字段已入 `/state`；FR-014/015/016/017 闭环；FR-006 指令入口 = dashboard） |
+| plan.md | ✅ 4 Phase 全部实现；无 CRITICAL/HIGH 遗留 |
+| tasks.md | ✅ T001-T051 已实现勾选；未勾 = 真机验收类（T015/T026/T032/T042/T046/T052）+ M4 视频合成（未开发，非本重构范围） |
+| 动作封闭性 | ✅ T038 四元自检 OK（ACTION_SPEC 30 = 桥 30/30 = docs/actions.md 30） |
+| 机制一致性 | ✅ T048 双向 OK（catalog 9 条目 ↔ docs/mechanics.md 14 节；M-TURN 为文档参考节） |
+| 测试 | ✅ 38 passed（T049；含 SC-009/SC-010 guard） |
+| 敏感性审查 | ✅ T054：全树无 IP/凭据/本地路径；`config.yaml` 未入库；README 含版权/免责声明（公开仓库口径） |
