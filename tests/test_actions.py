@@ -7,7 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pytest
 
-from agent.actions import ActionError, parse_actions, parse_plan
+from agent.actions import (ActionError, parse_actions, parse_plan, cost_of, untagged, COST_TAGS)
 
 
 def test_parse_actions_standard_list():
@@ -79,3 +79,39 @@ def test_parse_plan_empty_raises():
 def test_parse_plan_default_offsets():
     plan = parse_plan('[{"actions":[{"action":"invest","province_id":1,"gold":50}]}]')
     assert plan["turns"][0]["offset"] == 1
+
+
+def test_parse_plan_tactic_ref_verified_kept():
+    plan = parse_plan('{"turns":[{"tactic_ref":"war_cycle","actions":[]}]}')
+    assert plan["turns"][0]["tactic_ref"] == "war_cycle"
+
+
+def test_parse_plan_tactic_ref_unverified_raises():
+    with pytest.raises(ActionError, match="unverified tactic_ref"):
+        parse_plan('{"turns":[{"tactic_ref":"made_up_mech","actions":[]}]}')
+
+
+def test_parse_plan_legacy_no_ref_bagged():
+    plan = parse_plan('{"turns":[{"actions":[]},{"tactic_ref":"tech_science","actions":[]}]}')
+    assert plan["no_ref"] == 1
+    assert plan["turns"][1]["tactic_ref"] == "tech_science"
+
+
+def test_cost_tags_zero_miss():
+    assert untagged() == []
+
+
+def test_cost_of_l1_diplo_actions():
+    assert cost_of("ultimatum") == "diplo"
+    assert cost_of("support_rebels") == "multi"
+    assert cost_of("prepare_for_war") == "move"
+    assert cost_of("send_gift") == COST_TAGS["send_gift"]
+
+
+def test_parse_actions_new_l1_actions():
+    acts = parse_actions('[{"action":"send_gift","target_civ_id":4,"gold":200},'
+                         '{"action":"form_civilization"},'
+                         '{"action":"prepare_for_war","target_civ_id":3,"against_civ_id":5}]')
+    assert acts[0] == {"action": "send_gift", "target_civ_id": 4, "gold": 200}
+    assert acts[1] == {"action": "form_civilization"}
+    assert acts[2]["against_civ_id"] == 5

@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from agent.state import build_history, format_state_line
+from agent.state import (build_history, format_state_line, extract_ledger, ledger_line)
 
 
 def _sample_state():
@@ -63,3 +63,34 @@ def test_turn_context_contains_state_and_history():
     from agent.state import build_turn_context
     ctx = build_turn_context(_sample_state(), "T1 开局")
     assert "邻国:" in ctx and "T1 开局" in ctx and "我方省ID: 241,242" in ctx
+
+
+def test_format_state_line_optional_fields_should():
+    st = _sample_state()
+    st["diplomacy_points"] = 18
+    st["income"] = {"gold": 120, "move": 40, "diplo": 3, "tech": 0}
+    st["low_stability_list"] = [241]
+    st["war_score_res"] = {"mine": 0.62, "theirs": 0.31}
+    st["neighbors"][0].update({"diplomacy_points": 5, "stability": 0.7,
+                               "war_score": 0.31, "assimilates": [{"province_id": 300}]})
+    line = format_state_line(st)
+    assert "外点5" in line and "稳0.7" in line and "同化1" in line and "战争分0.31" in line
+    assert "低稳省x1" in line
+    assert "我0.62" in line and "敌0.31" in line
+
+
+def test_format_state_line_optional_fields_absent_are_placeholders():
+    line = format_state_line(_sample_state())
+    assert "外点?" in line and "稳?" in line and "同化0" in line
+    assert "低稳省x0" in line
+
+
+def test_extract_ledger_includes_diplo_and_income():
+    st = _sample_state()
+    st["diplomacy_points"] = 22
+    st["income"] = {"gold": 90, "move": 40, "diplo": 4, "tech": 3}
+    lg = extract_ledger(st)
+    assert lg["diplo_pts"] == 22
+    assert lg["income"] == {"gold": 90, "move": 40, "diplo": 4, "tech": 3}
+    l = ledger_line(lg)
+    assert "外交点22" in l and "收金90" in l and "外4" in l
