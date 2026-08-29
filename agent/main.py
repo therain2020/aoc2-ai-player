@@ -22,6 +22,7 @@ from agent.actions import (  # noqa: E402
     execute, parse_actions, result_ok, SKILL_CAPS, ActionError,
 )
 from agent.mechanics import cadence as mech_cadence  # noqa: E402
+from agent.mechanics import sanitize as mech_sanitize  # noqa: E402
 from agent.mechanics import reserve as mech_reserve  # noqa: E402
 from agent.mechanics import vision as mech_vision  # noqa: E402
 from agent import state as state_mod  # noqa: E402
@@ -321,6 +322,7 @@ def main():
     last_danger_replan = -99
     cadence = mech_cadence.CadenceTracker()
     vision = None
+    war_llm_fail_streak = 0
 
     def record_skip(cur, phase, ledger, reason) -> None:
         """T043: LLM 失败/输出无效兜底——SKIP_TURN 确定性推进 + FAIL 标记；
@@ -428,6 +430,27 @@ def main():
                 if last_war_turn == cur:
                     time.sleep(3)
                     continue
+                if war_llm_fail_streak >= 2:
+                    # 网络断（DNS 失败回退）：war 决策直接用规则订单，不空转
+                    orders = war_planner.plan_war_turn(st) or [
+                        {"action": "recruit_army",
+                         "province_id": int((st.get("my_provinces") or [0])[0]), "count": 500}]
+                    orders = value_normalizer.normalize_values(orders, st)
+                    results = execute(bridge, orders)
+                    ok_n = sum(1 for r in results if result_ok(r["result"]))
+                    print(f"  war orders {ok_n}/{len(results)} ok (planner net-fallback)", flush=True)
+                    round_append(session_dir, {
+                        "turn": cur, "ts": time.time(), "type": "war",
+                        "state": {k: st.get(k) for k in ("turn", "money", "provinces", "units")},
+                        "mechanic_phase": phase.phase_id, "tactic_ref": phase.tactic_ref,
+                        "ledger": ledger, "decision": orders, "results": results,
+                        "brief": "战争规则订单(断网回退)", "source": "planner-net-fallback",
+                        "tokens": dict(provider.last_usage), "tokens_cum": dict(provider.total),
+                    })
+                    last_war_turn = cur
+                    bridge.end_turn()
+                    time.sleep(4)
+                    continue
                 print(f"WAR TURN {cur}: tactical orders (rule-driven blitz)", flush=True)
                 war_trk.on_turn(cur)
                 stale = war_trk.stalemate_flags(cur)
@@ -475,6 +498,7 @@ def main():
                 try:
                     raw = chat_with_fallback(provider, WAR_SYSTEM_PROMPT, ctx2)
                 except LLMError as e:
+                    war_llm_fail_streak += 1
                     record_skip(cur, phase, ledger, f"war llm: {e}")
                     time.sleep(2)
                     continue
@@ -490,6 +514,7 @@ def main():
                         time.sleep(2)
                         continue
                 fail_streak = 0
+                war_llm_fail_streak = 0
                 if not war_actions:
                     # LLM 空决策（违反硬约束）→ 强制重试一次（警告），仍空才用建议保底
                     try:
@@ -507,6 +532,7 @@ def main():
                     war_actions = suggestion or [{"action": "recruit_army",
                                                   "province_id": int((st.get("my_provinces") or [0])[0]),
                                                   "count": 500}]
+                war_actions = mech_sanitize.sanitize_actions(war_actions, st)
                 war_actions = value_normalizer.normalize_values(war_actions, st)
                 results = execute(bridge, war_actions)
                 war_trk.note_results(cur, results, prev_provinces, st.get("provinces", 0))
@@ -643,6 +669,7 @@ def main():
                                                     st, thr)
             if injected:
                 print(f"  intent-added: {', '.join(injected)}", flush=True)
+            actions = mech_sanitize.sanitize_actions(actions, st)
             actions = value_normalizer.normalize_values(actions, st)
             results = execute(bridge, actions)
             ok_n = sum(1 for r in results if result_ok(r["result"]))

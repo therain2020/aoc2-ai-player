@@ -178,6 +178,8 @@ def enrich_actions(actions: list[dict], text: str, st: dict,
         return notes
     existing = {(a.get("action"), a.get("target_civ_id")) for a in actions}
     intents = detect_intents(text)
+    # 用户 bug 反馈（T3 双宣战灾难）：禁止注入器自动添加宣言（DOMINATE 只保留在提示词引导）
+    intents = [i for i in intents if i != "DOMINATE"]
     if danger:
         intents = _preempt_intent(intents, {"turns": [{"actions": actions}]}, danger, st)
     for intent in intents:
