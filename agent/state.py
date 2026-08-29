@@ -119,6 +119,74 @@ def threat_scan(st: dict) -> dict | None:
     return None
 
 
+def victory_progress(st: dict, session_dir: Path | None = None) -> str:
+    """Resident win-oriented context block (2026-08-29 user requirement).
+
+    Every decision must see: tech progress, territory standing vs biggest
+    neighbor, per-neighbor force ratio, recent force/territory trend and the
+    terminal signal — so the LLM plans toward a win, not just accumulation.
+    """
+    parts = ["【胜利进展】"]
+    my = st.get("provinces")
+    tech = st.get("my_tech")
+    parts.append(f"科技={tech or '?'}（VICTORY_TECHNOLOGY 未在 /state 暴露，以我方实际科技为准）" if tech is not None
+                 else "科技=?（胜利门槛未暴露）")
+    nbs = st.get("neighbors") or []
+    big = max(nbs, key=lambda n: (n.get("provinces") or 0), default=None)
+    if big:
+        parts.append(f"领土: 我{my}省 vs 最强{civ_big(big)} {big.get('provinces')}省"
+                     f"（省数比={round((my or 0) / max(big.get('provinces') or 1, 1), 2)}）")
+    my_units = int(st.get("units") or 0)
+    if my_units > 0:
+        ratios = ", ".join(
+            "civ{}:{}×{}".format(n.get("civ_id"), round((n.get("units") or 0) / my_units, 2),
+                                 "交战" if n.get("war") else "敌" if (n.get("relation") or 0) < 0 else "")
+            for n in nbs if isinstance(n, dict) and n.get("civ_id") is not None)
+        if ratios:
+            parts.append(f"邻国防务比(军): {ratios}")
+    trend = _force_trend(session_dir, 9)
+    if trend:
+        parts.append(trend)
+    ge = st.get("game_end")
+    ended = ge is True or (isinstance(ge, dict) and ge.get("ended") is True)
+    parts.append("终局信号: 无" if not ended else "终局信号: 已终局(停止行动)")
+    return "；".join(parts)
+
+
+def _force_trend(session_dir: Path | None, limit: int = 9) -> str:
+    """Compact province/units trend from the newest turns.jsonl records."""
+    if session_dir is None:
+        return ""
+    path = session_dir / "turns.jsonl"
+    if not path.exists():
+        return ""
+    pts = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            try:
+                d = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            s = d.get("state") or {}
+            if "provinces" in s and isinstance(s["provinces"], int):
+                pts.append((int(s.get("turn", 0)), int(s["provinces"]), int(s.get("units") or 0)))
+    if not pts:
+        return ""
+    pts = pts[-limit:]
+    t0, p0, u0 = pts[0]
+    t1, p1, u1 = pts[-1]
+    span = max(t1 - t0, 1)
+    dprov = p1 - p0
+    dun = u1 - u0
+    seq = "→".join(str(p) for _, p, _ in pts[:6])
+    return (f"趋势(T{t0}→T{t1}): 省 {seq}（净{p1 - p0:+d}）, 军 {u0}→{u1}（净{dun:+d}）, "
+            f"均每回合省{round(dprov / span, 2)}/军{round(dun / span, 0):.0f}")
+
+
+def civ_big(n: dict) -> int:
+    return n.get("civ_id") or -1
+
+
 def extract_ledger(st: dict) -> dict:
     """Resource budget line input (FR-017①): stock + per-turn income (if exposed).
 

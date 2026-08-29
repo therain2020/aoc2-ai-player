@@ -26,6 +26,7 @@ from agent.llm import create_provider  # noqa: E402
 from agent.llm.base import LLMError  # noqa: E402
 from agent.state import (  # noqa: E402
     build_history, build_turn_context, extract_ledger, ledger_line, threat_scan,
+    victory_progress,
 )
 from agent.mechanics import phases as mech_phases  # noqa: E402
 from agent.mechanics import prompts as mech_prompts  # noqa: E402
@@ -473,6 +474,7 @@ def main():
                 ctx = (f"{ledger_line(ledger)}\n{mech_prompts.budget_guard(ledger)}\n{phase_note}\n"
                        + danger_note
                        + set_msg_lines(ctx_store, st)
+                       + victory_progress(st, session_dir) + "\n"
                        + ctx
                        + mech_prompts.plan_turn_closing(cur))
                 try:

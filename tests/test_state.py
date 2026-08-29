@@ -132,6 +132,25 @@ def test_threat_scan_ignores_friendly_and_small():
     assert threat_scan(st) is None
 
 
+def test_victory_progress_block_contents(tmp_path):
+    from agent.state import victory_progress
+    st = _sample_state()
+    st["my_tech"] = 0.45
+    st["units"] = 600
+    st["neighbors"] = [{"civ_id": 55, "provinces": 8, "units": 300, "relation": -30,
+                        "war": True, "population": 1, "money": 1, "tech": 1,
+                        "capital": 1, "border_provinces": 1}]
+    with (tmp_path / "turns.jsonl").open("w", encoding="utf-8") as f:
+        for t in range(1, 6):
+            f.write(json.dumps({"turn": t, "state": {"turn": t, "provinces": 3 + t,
+                                                     "units": 100 * t}}) + "\n")
+    line = victory_progress(st, tmp_path)
+    for token in ("【胜利进展】", "科技", "领土", "邻国防务比", "趋势", "终局信号"):
+        assert token in line, token
+    assert "0.75×" in line or "civ55" in line
+    assert "省净+2" in line or "净+" in line
+
+
 def test_threat_scan_war_flag_override():
     st = _sample_state()
     st["units"] = 100
