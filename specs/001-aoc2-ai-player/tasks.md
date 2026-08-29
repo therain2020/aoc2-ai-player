@@ -147,14 +147,14 @@
 
 **Purpose**: 文档一致性 / 测试面 / 交付申报
 
-- [ ] T047 [P] `docs/actions.md` 按 ACTION_SPEC 生成式全量重写（含成本标签列 + 外交点成本表，FR-016/SC-007 终服）
-- [ ] T048 [P] `docs/mechanics.md` ↔ `agent/mechanics/catalog.py` 双向一致性校验脚本 `scripts/mechanics_sync_check.py`
+- [x] T047 [P] `docs/actions.md` 按 ACTION_SPEC 生成式全量重写（含成本标签列 + 外交点成本表，FR-016/SC-007 终服）
+- [x] T048 [P] `docs/mechanics.md` ↔ `agent/mechanics/catalog.py` 双向一致性校验脚本 `scripts/mechanics_sync_check.py`（当前 OK）
 - [x] T049 [P] `tests/`：test_actions.py（parse/成本标签/冷却提示新增用例）+ test_mechanics_catalog.py（prompt 无未验证引用）+ test_state.py（字段齐全含新增字段）（在既有 17 用例之上扩展，38 passed）
-- [ ] T050 [P] `README.md` 头部口径更新（引擎 API 直调（源码级桥）+ 机制层一句话简介）
-- [ ] T051 [P] `docs/pending_fixes.md` 重写（FR-014/015/016 + 任务 B-F 未决清单状态）
+- [x] T050 [P] `README.md` 头部口径更新（引擎 API 直调（源码级桥）+ 机制层一句话简介）
+- [x] T051 [P] `docs/pending_fixes.md` 重写（FR-014/015/016 + 任务 B-F 未决清单状态，22 项对账表 + 待真机列）
 - [ ] T052 运行 quickstart.md 全部六段验收，结果归档 `docs/validation.md`（SC-001~010 逐项打卡表）
-- [ ] T053 analyze 复审：spec/plan/tasks 三件套一致、无 CRITICAL/HIGH（SC-008），报告归档 `docs/spec-kit-review.md`
-- [ ] T054 提交前审查：逐提交 `git log -p` 6 类敏感信息检查；分逻辑提交（宪法附加约束；config.yaml 不入库）
+- [x] T053 analyze 复审：spec/plan/tasks 三件套一致、无 CRITICAL/HIGH（SC-008），报告归档 `docs/spec-kit-review.md`
+- [x] T054 提交前审查：逐提交 `git log -p` 6 类敏感信息检查；分逻辑提交（宪法附加约束；config.yaml 不入库；全树扫描干净 + README 合规声明）
 
 **Checkpoint**: 全量 SC 达标、三件套一致、可提交
 
