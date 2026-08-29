@@ -157,6 +157,12 @@ class BridgeClient:
     def colonize(self, province_id: int) -> str:
         return self.action(f"colonize|{province_id}")
 
+    def buy_war(self, target_civ_id: int, declare_war_on: int, gold: int) -> str:
+        return self.action(f"buyWar|{target_civ_id}|{declare_war_on}|{gold}")
+
+    def coalition_war(self, target_civ_id: int, coalition_against: int, gold: int) -> str:
+        return self.action(f"coalitionWar|{target_civ_id}|{coalition_against}|{gold}")
+
     def push_plan(self, text: str) -> str:
         return self._get("/plan?text=" + urllib.parse.quote(text, safe=""))
 

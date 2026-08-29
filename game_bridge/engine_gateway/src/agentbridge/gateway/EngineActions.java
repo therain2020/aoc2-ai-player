@@ -58,7 +58,9 @@ final class EngineActions {
             "civilize", "form_civilization", "proclaim_independence",
             "prepare_for_war", "call_to_arms",
             // 内政三动作 (T035)
-            "assimilate", "festival", "colonize"));
+            "assimilate", "festival", "colonize",
+            // 交易挑拨 (TradeRequest_GameData 双清单：LEFT=我方给金, RIGHT=对方宣誓战/联盟)
+            "buy_war", "coalition_war"));
 
     static final class Result {
         final String result; // "OK" | "FAIL"
@@ -110,6 +112,8 @@ final class EngineActions {
         else if (n.equals("proclaimIndependence")) { n = "proclaim_independence"; }
         else if (n.equals("prepareForWar")) { n = "prepare_for_war"; }
         else if (n.equals("callToArms")) { n = "call_to_arms"; }
+        else if (n.equals("buyWar")) { n = "buy_war"; }
+        else if (n.equals("coalitionWar")) { n = "coalition_war"; }
         else if (n.equals("assimilate")) { n = "assimilate"; }
         else if (n.equals("festival")) { n = "festival"; }
         else if (n.equals("colonize")) { n = "colonize"; }
@@ -158,6 +162,10 @@ final class EngineActions {
                 return militaryAccessAsk(ps);
             } else if (n.equals("military_access_give")) {
                 return militaryAccessGive(ps);
+            } else if (n.equals("buy_war")) {
+                return buyWar(ps);
+            } else if (n.equals("coalition_war")) {
+                return coalitionWar(ps);
             } else if (n.equals("improve_relations")) {
                 return improveRelations(ps);
             } else if (n.equals("decrease_relations")) {
@@ -593,6 +601,55 @@ final class EngineActions {
                     detail("target", target, "gold", gold));
         }
         return fail("trade_request", "FAIL|tradeRequest|" + target + "|外交点不足(需≥10)");
+    }
+
+    /** buyWar|target|warOn|gold — 给金(LEFT)买战争：要求 target 对 warOn 宣战
+     *  (RIGHT.iDeclarWarOnCivID -> acceptTradeRequest 引擎强制 declareWar(target, warOn)). */
+    private static Result buyWar(Map<String, Object> ps) {
+        int target = intP(ps, "target_civ_id", "target", "civ_id", "civ");
+        int warOn = intP(ps, "declare_war_on", "warOn");
+        int gold = intP(ps, "gold");
+        int me = me();
+        Object data = EngineApi.newInst(EngineApi.cls(TRADE_REQUEST));
+        Object left = EngineApi.newInst(EngineApi.cls(TRADE_REQUEST_LIST));
+        Object right = EngineApi.newInst(EngineApi.cls(TRADE_REQUEST_LIST));
+        EngineApi.set(left, "iGold", gold);
+        EngineApi.set(right, "iDeclarWarOnCivID", warOn);
+        EngineApi.set(data, "iCivLEFT", me);
+        EngineApi.set(data, "iCivRIGHT", target);
+        EngineApi.set(data, "listLEFT", left);
+        EngineApi.set(data, "listRight", right);
+        boolean okFlag = ((Boolean) EngineApi.call(EngineApi.cls(DIPLO), "sendTradeRequest",
+                target, me, data)).booleanValue();
+        if (okFlag) {
+            return ok("buy_war", "OK|buyWar|" + target + "|" + warOn + "|" + gold,
+                    detail("target", target, "declare_war_on", warOn, "gold", gold));
+        }
+        return fail("buy_war", "FAIL|buyWar|" + target + "|外交点不足(需≥10)");
+    }
+
+    /** coalitionWar|target|against|gold — 给金组联合阵线：双方对 against 宣战 + NAP40 + 军事通行40. */
+    private static Result coalitionWar(Map<String, Object> ps) {
+        int target = intP(ps, "target_civ_id", "target", "civ_id", "civ");
+        int against = intP(ps, "coalition_against", "against");
+        int gold = intP(ps, "gold");
+        int me = me();
+        Object data = EngineApi.newInst(EngineApi.cls(TRADE_REQUEST));
+        Object left = EngineApi.newInst(EngineApi.cls(TRADE_REQUEST_LIST));
+        Object right = EngineApi.newInst(EngineApi.cls(TRADE_REQUEST_LIST));
+        EngineApi.set(left, "iGold", gold);
+        EngineApi.set(right, "iFormCoalitionAgainst", against);
+        EngineApi.set(data, "iCivLEFT", me);
+        EngineApi.set(data, "iCivRIGHT", target);
+        EngineApi.set(data, "listLEFT", left);
+        EngineApi.set(data, "listRight", right);
+        boolean okFlag = ((Boolean) EngineApi.call(EngineApi.cls(DIPLO), "sendTradeRequest",
+                target, me, data)).booleanValue();
+        if (okFlag) {
+            return ok("coalition_war", "OK|coalitionWar|" + target + "|" + against + "|" + gold,
+                    detail("target", target, "coalition_against", against, "gold", gold));
+        }
+        return fail("coalition_war", "FAIL|coalitionWar|" + target + "|外交点不足(需≥10)");
     }
 
     /** nonAggressionPact|target — 互不侵犯 40 回合（扣 8 外交点） */

@@ -34,6 +34,11 @@ ACTION_SPEC = {
     "assimilate": {"province_id": int, "num_of_turns": int},
     "festival": {"province_id": int},
     "colonize": {"province_id": int},
+    # 交易机制（TradeRequest_GameData / TradeRequest_List 双清单，2026-08-29 源码核实）：
+    # 我方给 gold（listLEFT），要求对方 addRight 执行承诺——acceptTradeRequest 中
+    # listRight.iDeclarWarOnCivID -> declareWar(对方, 目标)；iFormCoalitionAgainst -> 双方宣战+NAP40+通行40
+    "buy_war": {"target_civ_id": int, "declare_war_on": int, "gold": int},
+    "coalition_war": {"target_civ_id": int, "coalition_against": int, "gold": int},
 }
 
 BUILDING_TYPES = ("fort", "farm", "library", "workshop", "armoury", "port", "supply")
@@ -88,6 +93,8 @@ COST_TAGS = {
     "assimilate": "multi",    # 6 外交点 + 同化 cost 金
     "festival": "multi",      # 8 行动点 + festivalCost 金
     "colonize": "multi",      # 14 外交点 + 行动点 + 金（科技<0.8 惩罚 ×8.25）
+    "buy_war": "multi",       # 金给目标 + 目标对 declare_war_on 宣战（引擎接受即执行）
+    "coalition_war": "multi", # 金 + 双方同时对 coalition_against 宣战 + NAP40 + 通行40
 }
 
 
@@ -259,6 +266,8 @@ def actions_prompt_spec() -> str:
         "civilize{target_civ_id} 开化(≥10外交点) | form_civilization 组建文明(24外交点+1000金) |\n"
         "proclaim_independence{target_civ_id} 独立宣言(扣10) | prepare_for_war{target_civ_id,against_civ_id} 命盟友备战 |\n"
         "call_to_arms{target_civ_id,against_civ_id} 号召盟友参战 |\n"
+        "buy_war{target_civ_id,declare_war_on,gold} 花钱让 target 对 declare_war_on 宣战（挑拨贸易，引擎强制执行） |\n"
+        "coalition_war{target_civ_id,coalition_against,gold} 花钱组成联合阵线：双方对 coalition_against 同时宣战+NAP40+通行40 |\n"
         "assimilate{province_id,num_of_turns} 同化敌对省(≥6外交点+钱,每省1单,10-50回合) |\n"
         "festival{province_id} 办节日提幸福(8行动点+钱) | colonize{province_id} 殖民荒芜省(≥14外交点+行动点+钱)\n"
         "动作资源成本: " + " ".join(f"{k}={v}" for k, v in COST_TAGS.items()) + "\n"
