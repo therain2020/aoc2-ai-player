@@ -44,7 +44,8 @@ def format_state_line(st: dict) -> str:
         f"省{f.get('from')}→省{f.get('to')}(civ{f.get('civ')},我{f.get('my_units')}兵/敌{f.get('enemy_units')}兵)"
         for f in flank[:8])) if flank else ""
     return (
-        f"T{st.get('turn')} 日期{st.get('date','?')} 金{st.get('money')} 省{st.get('provinces')} "
+        f"T{st.get('turn')} 日期{st.get('date','?')} 我civ{st.get('my_civ','?')} "
+        f"金{st.get('money')} 省{st.get('provinces')} "
         f"军{st.get('units')} 点{st.get('move_points')} 科技{st.get('my_tech','?')} "
         f"首都{st.get('capital','?')} 科技点剩{st.get('tech_points', '?')} 消息{st.get('messages')}\n"
         f"{skill_line}\n{detail}\n{stab_line}\n{treaty_line}\n{war_line}\n{front_line}\n邻国: {neigh}"

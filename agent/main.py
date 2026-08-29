@@ -329,9 +329,21 @@ def main():
             at_war = bool(st.get("wars")) or any(n.get("war") for n in st.get("neighbors", []))
             if at_war:
                 if st.get("messages", 0) > 0:
+                    mtypes = st.get("msg_types", "")
+                    dtypes = decision_types(mtypes)
+                    if dtypes:
+                        # decision-class msgs must NOT be cleared during war:
+                        # log them into ctx so this turn's war decision can act
+                        # (e.g. civilize confirm / peace with other civs)
+                        ctx_store.add_event("decision", ",".join(dtypes))
+                        print(f"DECISION MSG during war [{dtypes}] -> ctx only",
+                              flush=True)
+                        time.sleep(1)
+                        continue
                     bridge.respond_messages()
+                    ctx_store.sync_neighbors(st.get("neighbors", []))
+                    ctx_store.add_event("auto", ",".join(auto_types(mtypes)[:8]))
                     time.sleep(1)
-                    # no continue: proceed with war decision this turn
                 if last_war_turn == cur:
                     time.sleep(5)
                     continue

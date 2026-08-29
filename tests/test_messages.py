@@ -15,13 +15,14 @@ def test_decision_class_table():
     for t in ("Message_War", "Message_PeaceTreaty", "Message_TradeReuest",
               "Message_Ultimatum", "Message_WeCanSignPeace", "Message_WeCanSignPeace_StatusQou",
               "Message_NonAggressionPact", "Message_OfferVasalization",
-              "Message_MilitaryAccess_Ask", "Message_CallToArms", "Message_Gift"):
+              "Message_MilitaryAccess_Ask", "Message_CallToArms", "Message_Gift",
+              "Message_Uncivilized"):   # 开化确认=体制转换决策（2026-08-29 用户指正）
         assert classify(t) == "decision", t
 
 
 def test_auto_class_table():
     for t in ("Message_Relations_Increase", "Message_Relations_Increase_Ended",
-              "Message_TechPoints", "Message_Uncivilized", "Message_InvestDone",
+              "Message_TechPoints", "Message_InvestDone",
               "Message_AssimilationEnd", "Message_Truce_Expired", "Message_Disease",
               "Message_PeaceTreaty_Accepted", "Message_NonAggressionPact_Denied",
               "Message_Bulit_Farm", "Message_HighInflation"):
@@ -32,6 +33,13 @@ def test_decision_types_extract():
     raw = "Message_WeCanSignPeace,Message_Relations_Increase,Message_TechPoints"
     assert decision_types(raw) == ["Message_WeCanSignPeace"]
     assert auto_types(raw) == ["Message_Relations_Increase", "Message_TechPoints"]
+
+
+def test_uncivilized_is_decision_and_no_auto():
+    # 每回合重复推送由 MessageBox 去重；Agent 必须对开化确认做出回答（civilize 自己）
+    assert classify("Message_Uncivilized") == "decision"
+    assert "Message_Uncivilized" not in auto_types("Message_Uncivilized")
+    assert decision_types("Message_Uncivilized") == ["Message_Uncivilized"]
 
 
 def test_ctx_store_roundtrip(tmp_path: Path):

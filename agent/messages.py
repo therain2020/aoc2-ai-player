@@ -34,6 +34,11 @@ DECISION_TYPES = {
     "Message_Gift",                      # 礼赠请求
     "Message_TransferControl",           # 移交控制请求
     "Message_Union",                     # 合并提议
+    # 开化确认（2026-08-29 用户指正）：游牧/可开化体制文明满足科技门槛后，
+    # 引擎经 sendUncivilizedMessages 推送（仅玩家文明，MessageBox_GameData 去重更新剩余回合）。
+    # 确认=Menu_InGame_Civilize -> DiplomacyManager.civilizeCiv(自己) + 清消息；
+    # 消息带过期回合（iNumOfTurnsLeft），不确认则失去开化窗口 —— 必须决策。
+    "Message_Uncivilized",
 }
 
 # *_Accepted/*_Denied/*_Expired/*_Refused and every feedback/periodic type are
@@ -46,7 +51,6 @@ AUTO_TYPES = {
     "Message_Relations_Friendly",
     "Message_Relations_Insult",
     "Message_TechPoints",
-    "Message_Uncivilized",
     "Message_InvestDone",
     "Message_InvestDone_Development",
     "Message_ProvincesNotSupplied",
