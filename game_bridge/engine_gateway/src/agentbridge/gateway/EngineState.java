@@ -1,6 +1,7 @@
 package agentbridge.gateway;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -11,7 +12,8 @@ import java.util.Map;
  * turn_state/in_game/autosave_in/my_tech/capital/date/province_detail/wars/
  * stability/messages/msg_types/tech_points/skills/my_provinces/neighbors/
  * front_lines/treaties). Protected engine members are read via EngineApi.
- * Guarded extras requested by engine-api.md: diplomacy_points, assimilates.
+ * Guarded extras requested by engine-api.md (data-model §1): diplomacy_points,
+ * assimilates, income.*, low_stability_list, truce, war_score, game_end.
  */
 final class EngineState {
 
@@ -21,6 +23,7 @@ final class EngineState {
     private static final String CFG = "age.of.civilizations2.jakowski.lukasz.CFG";
     private static final String GAME_CALENDAR = "age.of.civilizations2.jakowski.lukasz.Game_Calendar";
     private static final String SAVE_MANAGER = "age.of.civilizations2.jakowski.lukasz.SaveManager";
+    private static final String GAME_ACTION = "age.of.civilizations2.jakowski.lukasz.Game_Action";
 
     private static volatile String lastState = "{}";
     private static volatile long lastStateMs = 0L;
@@ -156,7 +159,19 @@ final class EngineState {
                                 if (ws.length() > 0) {
                                     ws.append(',');
                                 }
-                                ws.append("{\"agg\":").append(ag).append(",\"def\":").append(df).append("}");
+                                int score = 0;
+                                int myScore = 0;
+                                try {
+                                    score = ((Integer) EngineApi.call(war, "getWarScore")).intValue();
+                                    boolean meAggressor = ((Boolean) EngineApi.call(war, "getIsAggressor", me)).booleanValue();
+                                    // engine score is defender-advantage: negative = aggressors lead
+                                    myScore = meAggressor ? -score : score;
+                                } catch (Throwable ignoredScore) {
+                                }
+                                ws.append("{\"agg\":").append(ag).append(",\"def\":").append(df)
+                                  .append(",\"war_score\":").append(score)
+                                  .append(",\"my_score\":").append(myScore)
+                                  .append(",\"their_score\":").append(-myScore).append("}");
                             }
                         }
                     } catch (Throwable ignored) {
@@ -361,6 +376,25 @@ final class EngineState {
             }
             sb.append(tr).append("}");
 
+            // contract extras — machine-readable truce per neighbor (getCivTruce, guarded)
+            sb.append(",\"truce\":[");
+            StringBuilder tc = new StringBuilder();
+            for (Map.Entry<Integer, Integer> e2 : nMap.entrySet()) {
+                int nc3 = e2.getKey().intValue();
+                try {
+                    int trcV = ((Integer) EngineApi.call(game(), "getCivTruce", me, nc3)).intValue();
+                    if (trcV <= 0) {
+                        continue;
+                    }
+                    if (tc.length() > 0) {
+                        tc.append(',');
+                    }
+                    tc.append("{\"civ_id\":").append(nc3).append(",\"turns\":").append(trcV).append("}");
+                } catch (Throwable ignored) {
+                }
+            }
+            sb.append(tc).append("],");
+
             // contract extras — diplomacy_points (guarded)
             try {
                 int dpPoints = ((Integer) EngineApi.call(EngineApi.call(game(), "getCiv", me), "getDiplomacyPoints")).intValue();
@@ -389,6 +423,46 @@ final class EngineState {
                 }
                 as.append("]");
                 sb.append(",\"assimilates\":").append(as);
+            } catch (Throwable ignored) {
+            }
+            // contract extras — income (FR-003): gold_in/gold_out/balance from
+            // Game_NextTurnUpdate, diplo_delta from Game_Action.updateCivsDiplomacyPoints
+            try {
+                Object ntu = EngineApi.get(EngineApi.cls(CFG), "game_NextTurnUpdate");
+                float goldIn = ((Number) EngineApi.call(ntu, "getIncome", me)).floatValue();
+                float goldOut = ((Number) EngineApi.call(ntu, "getExpenses", me)).floatValue();
+                int balance = ((Number) EngineApi.call(ntu, "getBalance", me)).intValue();
+                int diploDelta = ((Number) EngineApi.call(
+                        EngineApi.get(EngineApi.cls(CFG), "gameAction"), "getUpdateCivsDiplomacyPoints", me)).intValue();
+                sb.append(",\"income\":{")
+                  .append("\"gold_in\":").append(goldIn)
+                  .append(",\"gold_out\":").append(goldOut)
+                  .append(",\"balance\":").append(balance)
+                  .append(",\"diplo_delta\":").append(diploDelta)
+                  .append("}");
+            } catch (Throwable ignored) {
+            }
+            // contract extras — low_stability_list (civ.lProvincesWithLowStability, guarded)
+            try {
+                Object lowList = EngineApi.get(EngineApi.call(game(), "getCiv", me), "lProvincesWithLowStability");
+                if (lowList instanceof List) {
+                    List<?> low = (List<?>) lowList;
+                    StringBuilder ls = new StringBuilder("[");
+                    for (int i = 0; i < low.size() && ls.length() < 500; ++i) {
+                        if (i > 0) {
+                            ls.append(',');
+                        }
+                        ls.append(low.get(i).toString());
+                    }
+                    ls.append("]");
+                    sb.append(",\"low_stability_list\":").append(ls);
+                }
+            } catch (Throwable ignored) {
+            }
+            // contract extras — game_end signal (Game_Action.gameEnded)
+            try {
+                boolean ended = ((Boolean) EngineApi.get(EngineApi.cls(GAME_ACTION), "gameEnded")).booleanValue();
+                sb.append(",\"game_end\":{\"ended\":").append(ended).append("}");
             } catch (Throwable ignored) {
             }
 

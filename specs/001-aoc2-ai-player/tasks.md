@@ -104,8 +104,8 @@
 
 ### Implementation for User Story 4
 
-- [ ] T033 [US4] /state 资源面扩展（FR-003）：diplomacy_points（`getDiplomacyPoints()`）+ income 组（`getIncome/getExpenses/getBalance` + `getUpdateCivsDiplomacyPoints` 净额）+ assimilates + low_stability_list + truce（`getCivTruce`）+ war_score 双方（`getWarScore`）+ game_end 信号（data-model §1 engine-api.md）
-- [ ] T034 [US4] L1 外交全集落地（docs/mechanics.md L1 → ACTION_SPEC + EngineGateway）：send_gift / send_insult / trade_request / nonaggression_pact / offer_vasalization / military_access_give|ask / improve_relations / decrease_relations / support_rebels / ultimatum / civilize / form_civilization / proclaim_independence / prepare_for_war / call_to_arms（按 docs/mechanics.md 成本表逐项校验耗点后实现）
+- [x] T033 [US4] /state 资源面扩展（FR-003）：diplomacy_points（`getDiplomacyPoints()`）+ income 组（`getIncome/getExpenses/getBalance` + `getUpdateCivsDiplomacyPoints` 净额）+ assimilates + low_stability_list + truce（`getCivTruce`）+ war_score 双方（`getWarScore`）+ game_end 信号（data-model §1 engine-api.md）
+- [x] T034 [US4] L1 外交全集落地（docs/mechanics.md L1 → ACTION_SPEC + EngineGateway）：send_gift / send_insult / trade_request / nonaggression_pact / offer_vasalization / military_access_give|ask / improve_relations / decrease_relations / support_rebels / ultimatum / civilize / form_civilization / proclaim_independence / prepare_for_war / call_to_arms（按 docs/mechanics.md 成本表逐项校验耗点后实现）
 - [ ] T035 [US4] [P] assimilate / festival / colonize 动作实现（DiplomacyManager.addAssimilate/addFestival/colonize + 前置校验：外交点≥6、钱、移动点、殖民递进（diplo14/行动力/科技惩罚））
 - [ ] T036 [US4] [P] 上下文 prompt 组装升级：邻国画像补外交点/同化状态/稳定/战争分数;plan.brief 必须含国力对比判断
 - [ ] T037 [US4] 科技点兜底回归（auto_invest 保留；八类顺序与文档同步）
