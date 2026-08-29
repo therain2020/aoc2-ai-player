@@ -174,6 +174,10 @@
 - [x] R008 [P] [US1] dashboard 计划面板改渲染愿景（`narrator/dashboard.py` /api/plan + 前端卡片仅显示 brief/tactic 状态）
 - [x] R009 [P] [US1] 测试 `tests/test_cadence.py`（2 回合节拍+5 类事件触发）、`tests/test_reserve.py`（floor 公式/击穿/负收入）、`tests/test_vision.py`（愿景格式/重生成触发）
 - [ ] R010 [US1] 真机过检（quickstart §4b：节拍计数/SC-011 储备/≤6000 token 抽样）— 需游戏窗口（用户在场）
+- [x] R011 [US1] 动作消毒器（engine-legal 白名单：move 前线对+集结放行/单宣战/募兵≤2/破产禁募）`agent/mechanics/sanitize.py`（511cfc1 已实现；含测试）
+- [x] R012 [US1] 驻军真实性（桥 getArmyCivID×3 + `armies_overview` 字段）+ `scripts/battle_map.py` 战场图（511cfc1 已实现；armies 需重打包后真机验证）
+- [x] R013 [US1] 战败止损（战争分≤-20 自动求和 + 金<0 禁募 45729d1/1f6e19e 已实现；SC-012 真机待验）
+- [x] R014 [US1] 状态可观测（暂停语义化 #user/#auto + agent/status.py 统一快照 + dashboard 源标签 846ab29/041ba6d 已实现）
 
 **Checkpoint**: 决策范式切换完成——SC-001(新)/SC-005/SC-011 过检，vision 面板可读
 

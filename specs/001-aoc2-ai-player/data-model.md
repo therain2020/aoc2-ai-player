@@ -8,6 +8,7 @@
 |---|---|---|
 | 回合 | `turn` `date` `turn_state` `in_game` | 现有桥 + `TurnStates` 枚举 |
 | 资源存量 | `money` `move_points` `tech_points` **`diplomacy_points`** | `Civ.getDiplomacyPoints()` |
+| **驻军真实** | **`armies_overview`** `[{prov, army>0}]`（我方有兵省全量；语义=`getArmyCivID(civ)` 无假0） | 部署/集结依据（FR-021） |
 | 资源收入/回合 | **`income`**（`gold_in/gold_out` ← `getIncome/getExpenses/getBalance`；`diplo_delta` ← `getUpdateCivsDiplomacyPoints`；`move_set` ← set 公式复算） | 桥每回合聚合一次 |
 | 国家 | `provinces` `units` `capital` `stability` `happiness` `rev_risk` `skills` | 现有 |
 | 外交 | `treaties` `wars` `front_lines` `neighbors`（完整画像）+ `truce`（`getCivTruce`） | 现有 + 深读补 |
