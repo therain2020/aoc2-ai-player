@@ -137,10 +137,17 @@ public final class BridgeHttpServer {
      */
     private static void handlePlan(HttpExchange ex) throws IOException {
         String query = ex.getRequestURI().getRawQuery();
-        if ("GET".equalsIgnoreCase(ex.getRequestMethod()) && query != null && query.contains("text=")) {
-            String text = URLDecoder.decode(query, "UTF-8").replace("text=", "");
-            EngineGateway.setPlanText(text);
-            respondJson(ex, 200, "{\"result\":\"OK\",\"log\":\"OK|plan|" + text.length() + "\",\"detail\":{\"chars\":" + text.length() + "}}");
+        if ("GET".equalsIgnoreCase(ex.getRequestMethod())) {
+            if (query != null && query.contains("text=")) {
+                String text = URLDecoder.decode(query, "UTF-8").replace("text=", "");
+                EngineGateway.setPlanText(text);
+                respondJson(ex, 200, "{\"result\":\"OK\",\"log\":\"OK|plan|" + text.length() + "\",\"detail\":{\"chars\":" + text.length() + "}}");
+                return;
+            }
+            // GET /plan without text=: dashboard read-back of the last POST /plan body
+            String stored = EngineGateway.planJson;
+            respondJson(ex, 200, "{\"result\":\"OK\",\"log\":\"plan-read\",\"detail\":"
+                    + (stored == null || stored.length() == 0 ? "{}" : stored) + "}");
             return;
         }
         String body = readBody(ex);
@@ -186,6 +193,7 @@ public final class BridgeHttpServer {
             text.append(" (").append(turns).append(" turns, ").append(actions).append(" actions)");
         }
         EngineGateway.setPlanText(text.toString());
+        EngineGateway.setPlanJson(body);
         respondJson(ex, 200, "{\"result\":\"OK\",\"log\":\"OK|plan|" + text.length() + "\",\"detail\":{\"brief\":" + Json.quote(brief) + ",\"turns\":" + turns + ",\"actions\":" + actions + "}}");
     }
 

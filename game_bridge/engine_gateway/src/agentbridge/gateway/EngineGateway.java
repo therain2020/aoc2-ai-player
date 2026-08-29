@@ -58,6 +58,8 @@ public final class EngineGateway {
     static volatile String hudLine4 = "";
     static volatile String hudLine5 = "";
     static volatile String planText = "";
+    /** Raw POST /plan JSON body (dashboard GET /plan read-back). */
+    static volatile String planJson = "";
 
     static String hudLine(int i) {
         switch (i) {
@@ -80,6 +82,10 @@ public final class EngineGateway {
 
     static void setPlanText(String text) {
         planText = text == null ? "" : text;
+    }
+
+    static void setPlanJson(String json) {
+        planJson = json == null ? "" : json;
     }
 
     private static void persistHud() {

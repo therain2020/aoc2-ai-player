@@ -71,9 +71,9 @@
 
 ### Implementation for User Story 2
 
-- [ ] T022 [US2] `narrator/dashboard.py` 指挥控件：POST /api/command（strategy_text/gear/pause → 写 aoc2_strategy.txt + 暂停文件；校验档位 1-6、文本非空）（dashboard-api.md）
-- [ ] T023 [US2] [P] `narrator/dashboard.py` 监控面板：GET /api/state TTL 2s（决策流/资源台账/国家状态）+ 前端轮询
-- [ ] T024 [US2] [P] 计划面板：GET /api/plan → 10 回合计划 + brief + tactic_ref 渲染
+- [x] T022 [US2] `narrator/dashboard.py` 指挥控件：POST /api/command（strategy_text/gear/pause → 写 aoc2_strategy.txt + 暂停文件；校验档位 1-6、文本非空）（dashboard-api.md）
+- [x] T023 [US2] [P] `narrator/dashboard.py` 监控面板：GET /api/state TTL 2s（决策流/资源台账/国家状态）+ 前端轮询
+- [x] T024 [US2] [P] 计划面板：GET /api/plan → 10 回合计划 + brief + tactic_ref 渲染
 - [x] T025 [US2] FR-006 收尾：`AgentBridge`/新桥侧移除热键处理（Insert/PageUp/PageDown/END 已决议移除）；HUD 只读链路（/hud → aoc2_hud.txt → 启动读回）由新桥保持
 - [ ] T026 [US2] US2 独立验证：按 quickstart §5 全项打卡（含 2s 刷新与重启恢复录屏证据）
 
@@ -122,7 +122,7 @@
 ### Implementation for User Story 5
 
 - [ ] T039 [US5] `recorder/`（或 agent/state.py 落盘处）turns.jsonl 字段扩展：ledger + mechanic_phase + tactic_ref + war events + game_end 信号（data-model §6）
-- [ ] T040 [US5] [P] `narrator/dashboard.py` 数据流 ≤2s：轮询 + 增量渲染决策流/资源曲线/余额（复用既有 token 面板）
+- [x] T040 [US5] [P] `narrator/dashboard.py` 数据流 ≤2s：轮询 + 增量渲染决策流/资源曲线/余额（复用既有 token 面板）
 - [ ] T041 [US5] [P] `narrator/timeline.py` 兼容扩展字段（mechanic_phase/tactic_ref 显示卡片）
 - [ ] T042 [US5] US5 独立验收（quickstart §4-5/§3 复用）：timeline 完整 + dashboard 最新值断言脚本
 
