@@ -87,11 +87,11 @@
 
 ### Implementation for User Story 3
 
-- [ ] T027 [US3] `agent/mechanics/catalog.py` 内容填充第一波（verified=source）：internal_stability_gate / war_cycle / assimilation_window / diplo_economy / invest_cycle / stability_revolt / tech_science / colonization / win_conditions（锚定 docs/mechanics.md 行号）
-- [ ] T028 [US3] `agent/mechanics/prompts.py` 重构：批量计划 prompt + WAR 分支 prompt——资源预算行（ledger）+ 机制引导（tactic 引用 catalog）+ 成本四原则（FR-017①-③）
+- [x] T027 [US3] `agent/mechanics/catalog.py` 内容填充第一波（verified=source）：internal_stability_gate / war_cycle / assimilation_window / diplo_economy / invest_cycle / stability_revolt / tech_science / colonization / win_conditions（锚定 docs/mechanics.md 行号）
+- [x] T028 [US3] `agent/mechanics/prompts.py` 重构：批量计划 prompt + WAR 分支 prompt——资源预算行（ledger）+ 机制引导（tactic 引用 catalog）+ 成本四原则（FR-017①-③）
 - [x] T029 [US3] [P] **两机制消息模型（2026-08-29 用户拍板，已实现）**：`agent/messages.py` 源码级分类表（决策类=宣战/和谈/交易/通牒/协议请求 17 型；其余含 *_Accepted/Denied/Expired 与关系/周期/建成反馈 = 自动）+ `agent/context_store.py` 常驻上下文仓（aoc2_context.json：邻国关系快照同步→下轮决策参考；非邻国/事件→仅持久化）+ main.py 接入（AUTO→respond+同步+零 LLM；DECISION→绝不自动应答、记 ctx、触发再计划）；科技阶段引导入 prompt（战争→军费/科研；和平→税/经/产；封顶即换）
-- [ ] T030 [US3] [P] 战争分支升级：M-WAR 参数化（单省≥10 才攻、前线评分、僵局 39/49/299 阈值触发和谈 branch；peace_treaty 由 FR-014 链路承担）
-- [ ] T031 [US3] `parse_plan`/校验：tactic_ref ∈ catalog[verified]；legacy 兼容（旧 plan 无 tactic_ref → bag into `no_ref`）
+- [x] T030 [US3] [P] 战争分支升级：M-WAR 参数化（单省≥10 才攻、前线评分、僵局 39/49/299 阈值触发和谈 branch；peace_treaty 由 FR-014 链路承担）
+- [x] T031 [US3] `parse_plan`/校验：tactic_ref ∈ catalog[verified]；legacy 兼容（旧 plan 无 tactic_ref → bag into `no_ref`）
 - [ ] T032 [US3] US3 独立验收：≥8 回合零调用 → 开战单次调用 → 周期消息不重规划（数据取自 turns.jsonl tokens/tactic_ref 列）
 
 **Checkpoint**: 成本纪律+机制层化批量计划落地
@@ -107,8 +107,8 @@
 - [x] T033 [US4] /state 资源面扩展（FR-003）：diplomacy_points（`getDiplomacyPoints()`）+ income 组（`getIncome/getExpenses/getBalance` + `getUpdateCivsDiplomacyPoints` 净额）+ assimilates + low_stability_list + truce（`getCivTruce`）+ war_score 双方（`getWarScore`）+ game_end 信号（data-model §1 engine-api.md）
 - [x] T034 [US4] L1 外交全集落地（docs/mechanics.md L1 → ACTION_SPEC + EngineGateway）：send_gift / send_insult / trade_request / nonaggression_pact / offer_vasalization / military_access_give|ask / improve_relations / decrease_relations / support_rebels / ultimatum / civilize / form_civilization / proclaim_independence / prepare_for_war / call_to_arms（按 docs/mechanics.md 成本表逐项校验耗点后实现）
 - [x] T035 [US4] [P] assimilate / festival / colonize 动作实现（DiplomacyManager.addAssimilate/addFestival/colonize + 前置校验：外交点≥6、钱、移动点、殖民递进（diplo14/行动力/科技惩罚））
-- [ ] T036 [US4] [P] 上下文 prompt 组装升级：邻国画像补外交点/同化状态/稳定/战争分数;plan.brief 必须含国力对比判断
-- [ ] T037 [US4] 科技点兜底回归（auto_invest 保留；八类顺序与文档同步）
+- [x] T036 [US4] [P] 上下文 prompt 组装升级：邻国画像补外交点/同化状态/稳定/战争分数;plan.brief 必须含国力对比判断
+- [x] T037 [US4] 科技点兜底回归（auto_invest 保留；八类顺序与文档同步，SKILL_CAPS 单源）
 - [ ] T038 [US4] `scripts/action_closure_check.py`：catalog ∪ ACTION_SPEC ∪ 桥实现 ∪ docs/actions.md 四元一致判定（SC-009/SC-010 自检，产报告）
 
 **Checkpoint**: 决策上下文 + 动作空间封闭（3 个 SC 达标收底）
@@ -136,9 +136,9 @@
 
 ### Implementation for User Story 6
 
-- [ ] T043 [US6] LLM 失败兜底实现：重试 1 次（附"上次输出不合法"）→ 失败走 SKIP_TURN（确定性动作/推进 + FAIL 标记记录）→ 连续 3 回合 FAIL 则暂停并 dashboard 告警（taskE 语义，spec Edge Cases）
-- [ ] T044 [US6] [P] `agent/panel.py` 防重加固：pid 文件 + pid/命令行双匹配杀尽（既有 + 网关进程一并管）；Start 前 bridge_ready 检查
-- [ ] T045 [US6] [P] `agent/main.py` 门强化：主菜单预览双重判定（in_game=false 且 turn≤1）；过渡视图跳过清单确认（NextPlayerTurn/TURN_ACTIONS 快进/LOAD_*/StartTheGame done）
+- [x] T043 [US6] LLM 失败兜底实现：重试 1 次（附"上次输出不合法"）→ 失败走 SKIP_TURN（确定性动作/推进 + FAIL 标记记录）→ 连续 3 回合 FAIL 则暂停并 dashboard 告警（taskE 语义，spec Edge Cases）
+- [x] T044 [US6] [P] `agent/panel.py` 防重加固：pid 文件 + pid/命令行双匹配杀尽（既有 + 网关进程一并管）；Start 前 bridge_ready 检查
+- [x] T045 [US6] [P] `agent/main.py` 门强化：主菜单预览双重判定（in_game=false 且 turn≤1）；过渡视图跳过清单确认（NextPlayerTurn/TURN_ACTIONS 快进/LOAD_*/StartTheGame done）
 - [ ] T046 [US6] US6 独立验收（quickstart §4）：杀尽/等待/暂停 + 3 连败告警人工复核
 
 **Checkpoint**: 生产可靠性闭环（进程/门/失败三防线）
@@ -149,7 +149,7 @@
 
 - [ ] T047 [P] `docs/actions.md` 按 ACTION_SPEC 生成式全量重写（含成本标签列 + 外交点成本表，FR-016/SC-007 终服）
 - [ ] T048 [P] `docs/mechanics.md` ↔ `agent/mechanics/catalog.py` 双向一致性校验脚本 `scripts/mechanics_sync_check.py`
-- [ ] T049 [P] `tests/`：test_actions.py（parse/成本标签/冷却提示新增用例）+ test_mechanics_catalog.py（prompt 无未验证引用）+ test_state.py（字段齐全含新增字段）（在既有 17 用例之上扩展）
+- [x] T049 [P] `tests/`：test_actions.py（parse/成本标签/冷却提示新增用例）+ test_mechanics_catalog.py（prompt 无未验证引用）+ test_state.py（字段齐全含新增字段）（在既有 17 用例之上扩展，38 passed）
 - [ ] T050 [P] `README.md` 头部口径更新（引擎 API 直调（源码级桥）+ 机制层一句话简介）
 - [ ] T051 [P] `docs/pending_fixes.md` 重写（FR-014/015/016 + 任务 B-F 未决清单状态）
 - [ ] T052 运行 quickstart.md 全部六段验收，结果归档 `docs/validation.md`（SC-001~010 逐项打卡表）
