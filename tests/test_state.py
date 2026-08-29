@@ -170,7 +170,8 @@ def test_fill_empty_turns():
     _fill_empty_turns(plan, {"tech_points": 0, "my_provinces": [7]})
     assert plan["turns"][1]["actions"] == [{"action": "invest", "province_id": 1, "gold": 500}]
     assert plan["turns"][1]["note"].endswith("[fill]延续")
-    assert plan["turns"][2]["actions"] == [{"action": "recruit_army", "province_id": 7, "count": 50}]
+    # 延续链：后续空回合同样继承首动作（守卫征兵只在无前例时兜底）
+    assert plan["turns"][2]["actions"] == [{"action": "invest", "province_id": 1, "gold": 500}]
     plan2 = {"turns": [{"offset": 1, "actions": []}]}
     _fill_empty_turns(plan2, {"tech_points": 12, "my_provinces": [7]})
     assert plan2["turns"][0]["actions"][0]["action"] == "invest_tech"
