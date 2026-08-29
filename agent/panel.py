@@ -180,25 +180,29 @@ def _config():
 
 
 def _latest_turn_summary():
-    """(session_dir_name, rows, last_record) from the newest agent session turns.jsonl."""
+    """(session_dir_name, rows, last_record) from the NEWEST agent session dir
+    (by dir mtime) — shows the current run even before its first turn lands."""
     base = REPO / "sessions"
     if not base.exists():
         return None
     import json
-    paths = sorted(base.glob("*agent*/turns.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
-    if not paths:
-        return None
-    p = paths[0]
-    n = 0
-    last = None
-    try:
-        with p.open("r", encoding="utf-8") as f:
-            for line in f:
-                n += 1
-                last = json.loads(line)
-    except (OSError, json.JSONDecodeError):
-        pass
-    return (p.parent.name, n, last)
+    dirs = sorted((d for d in base.iterdir() if d.is_dir() and "agent" in d.name),
+                  key=lambda d: d.stat().st_mtime, reverse=True)
+    for d in dirs[:3]:
+        p = d / "turns.jsonl"
+        if not p.exists():
+            return (d.name, 0, None)
+        n = 0
+        last = None
+        try:
+            with p.open("r", encoding="utf-8") as f:
+                for line in f:
+                    n += 1
+                    last = json.loads(line)
+        except (OSError, json.JSONDecodeError):
+            pass
+        return (d.name, n, last)
+    return None
 
 
 def show_status():

@@ -28,6 +28,7 @@ from agent.state import (  # noqa: E402
     build_history, build_turn_context, extract_ledger, ledger_line, threat_scan,
     victory_progress,
 )
+from agent.mechanics import gears as mech_gears  # noqa: E402
 from agent.mechanics import phases as mech_phases  # noqa: E402
 from agent.mechanics import prompts as mech_prompts  # noqa: E402
 from agent.messages import (  # noqa: E402
@@ -39,7 +40,6 @@ from recorder.session import create_session  # noqa: E402
 
 CONFIG_GAME_ROOT = ""
 
-SYSTEM_PROMPT = mech_prompts.build_plan_system()
 WAR_SYSTEM_PROMPT = mech_prompts.build_war_system()
 
 
@@ -177,6 +177,19 @@ def str_sig(s: str) -> str:
     return hashlib.md5((s or "").encode("utf-8")).hexdigest()
 
 
+def _auto_clear_stale_pause(game_root: str) -> None:
+    """A stale auto-pause (3x consecutive LLM failures from an old session)
+    silently blocks every new run — clear it at startup; manual dashboard
+    pauses use a different marker and are respected."""
+    p = Path(game_root) / "aoc2_pause.txt"
+    try:
+        if p.exists() and "3 consecutive LLM failures" in p.read_text(encoding="utf-8", errors="replace"):
+            p.unlink()
+            print("cleared stale auto-pause (previous session's 3x LLM failures)", flush=True)
+    except OSError:
+        pass
+
+
 class WarTracker:
     """T030 M-WAR parametrization: track stalemate signals per war episode.
 
@@ -265,6 +278,7 @@ def main():
         sys.exit(2)
     global CONFIG_GAME_ROOT
     CONFIG_GAME_ROOT = game_root
+    _auto_clear_stale_pause(game_root)
 
     ctx_store = CtxStore(Path(game_root) / "aoc2_context.json")
 
@@ -328,6 +342,7 @@ def main():
             ge = st.get("game_end")
             ended = ge is True or (isinstance(ge, dict) and ge.get("ended") is True)
             if ended:
+                print("[dbg] ended-gate", flush=True)
                 time.sleep(10)
                 continue
             if ts != "INPUT_ORDERS":
@@ -338,9 +353,11 @@ def main():
             # gate: only act on a real game (in-game view, or a played turn exists —
             # menu preview instances always report turn 1)
             if not st.get("in_game", False) and cur <= 1:
+                print("[dbg] menu-gate", flush=True)
                 time.sleep(4)
                 continue
             if Path(game_root, "aoc2_pause.txt").exists():
+                print("[dbg] pause-gate", flush=True)
                 time.sleep(2)
                 continue
             # keep balance/token HUD live even between plan executions
@@ -477,8 +494,10 @@ def main():
                        + victory_progress(st, session_dir) + "\n"
                        + ctx
                        + mech_prompts.plan_turn_closing(cur))
+                # gear-aware system prompt: current gear's engine-API policy injected
+                plan_sys = mech_prompts.build_plan_system(mech_gears.gear_index(strat))
                 try:
-                    raw = chat_with_fallback(provider, SYSTEM_PROMPT, ctx)
+                    raw = chat_with_fallback(provider, plan_sys, ctx)
                 except LLMError as e:
                     record_skip(cur, phase, ledger, f"plan llm: {e}")
                     continue
@@ -488,7 +507,7 @@ def main():
                     print(f"plan invalid ({e}), retrying once", flush=True)
                     try:
                         plan = parse_plan(chat_with_fallback(
-                            provider, SYSTEM_PROMPT, ctx, "上次输出不合法，请严格按格式输出。"))
+                            provider, plan_sys, ctx, "上次输出不合法，请严格按格式输出。"))
                     except (ActionError, json.JSONDecodeError, LLMError) as e2:
                         record_skip(cur, phase, ledger, f"plan invalid x2: {e2}")
                         continue
