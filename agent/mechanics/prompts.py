@@ -105,9 +105,10 @@ def build_war_system() -> str:
         "③ 反击：敌人进入我方纵深省份（我方失去省）→ 立即组织反击/重夺（move_army 反向夺回），"
         "或在其薄弱侧翼开辟新战线。\n"
         "④ 僵局/整体劣势：参考【危险信号】与战争分数（僵局 39/49/299 回合无进展）→ peace_treaty 止损。\n"
-        "和谈回应：若【待处决策消息】含对方求和/和约（WeCanSignPeace/PeaceTreaty）——"
-        "我方动作面无 accept 动作：愿意停战→对交战方输出 peace_treaty{target_civ_id}（代表接受停战提案）；"
-        "不愿停战→按正常打。\n"
+        "和谈回应：若【待处决策消息】含对方求和/和约（WeCanSignPeace/PeaceTreaty）——显式回应，不得无视："
+        "我方优势（战争分≥+20）→ peace_treaty{target_civ_id} 接受锁定战果（避免拖泥带水，engine 自动分胜利点）；"
+        "军力≥敌×2.5 且大胜（+70）→ 可继续碾压灭国（note 说明拒绝原因）；"
+        "劣势/无胜算 → peace_treaty 止损。\n"
         "硬约束：actions **禁止为空数组**——必须至少 1 个动作（无事可做=1 个最小动作如集结/征兵/前线移动）。\n"
         "禁止投资/建设/结盟/慢速备战；【金库提示】只给你权衡信息，不限制征兵与军事移动。\n"
         "机制引导（战争）:\n" + mechanic_guidance("war_cycle") + "\n" + actions_prompt_spec()

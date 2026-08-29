@@ -454,7 +454,40 @@ def main():
                 print(f"WAR TURN {cur}: tactical orders (rule-driven blitz)", flush=True)
                 war_trk.on_turn(cur)
                 stale = war_trk.stalemate_flags(cur)
-                # 战败止损硬规则：我方战争分 ≤ -20 → 自动求和（引擎 AI 同款姿势）
+                # 敌方求和显式回应（2026-08-29 用户：不得无视求和消息）：
+                # 优势 ≥ +20 → 接受求和收割（peace_treaty 确认停战）；大优势+军力碾压可继续歼灭
+                my_score_now = 0
+                for w in st.get("wars", []) or []:
+                    try:
+                        my_score_now = int(w.get("my_score") or 0)
+                    except (TypeError, ValueError):
+                        pass
+                enemy_units_now = sum(int(n.get("units") or 0) for n in st.get("neighbors", []) if n.get("war"))
+                if ("Message_WeCanSignPeace" in (st.get("msg_types") or "") or
+                        "Message_PeaceTreaty" in (st.get("msg_types") or "")):
+                    if my_score_now >= 20 and not (my_score_now >= 70 and int(st.get("units") or 0) >= enemy_units_now * 2.5):
+                        tgt = None
+                        for n in st.get("neighbors", []):
+                            if n.get("war"):
+                                tgt = n.get("civ_id")
+                                break
+                        if tgt is not None:
+                            r = bridge.peace_treaty(tgt)
+                            print(f"  敌求和 我+{my_score_now} → 接受锁定战果 peace_treaty(civ{tgt}): {str(r)[:70]}",
+                                  flush=True)
+                            round_append(session_dir, {
+                                "turn": cur, "ts": time.time(), "type": "war",
+                                "mechanic_phase": phase.phase_id, "tactic_ref": phase.tactic_ref,
+                                "ledger": ledger,
+                                "decision": [{"action": "peace_treaty", "target_civ_id": tgt}],
+                                "results": [{"action": "peace_treaty", "result": r}],
+                                "brief": "接受敌方求和（优势收割）",
+                                "tokens": dict(provider.last_usage), "tokens_cum": dict(provider.total),
+                            })
+                            last_war_turn = cur
+                            bridge.end_turn()
+                            time.sleep(4)
+                            continue
                 my_score = -1
                 for w in st.get("wars", []) or []:
                     try:
