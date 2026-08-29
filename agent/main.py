@@ -127,6 +127,66 @@ def str_sig(s: str) -> str:
     return hashlib.md5((s or "").encode("utf-8")).hexdigest()
 
 
+class WarTracker:
+    """T030 M-WAR parametrization: track stalemate signals per war episode.
+
+    Engine AI peace triggers (docs/mechanics.md:77): last battle > 39 turns
+    (no battle > 19), no conquest for 49 turns, war > 299 turns.
+    """
+
+    def __init__(self):
+        self.start: int | None = None
+        self.last_battle: int | None = None
+        self.last_conquest: int | None = None
+
+    def on_turn(self, turn: int):
+        if self.start is None:
+            self.start = turn
+
+    def note_results(self, turn: int, results: list, prev_provinces: int, now_provinces: int):
+        for r in results:
+            if r.get("action") == "move_army" and str(r.get("result", "")).startswith("OK"):
+                self.last_battle = turn
+        if now_provinces > prev_provinces:
+            self.last_conquest = turn
+
+    def stalemate_flags(self, cur: int) -> list[str]:
+        flags = []
+        if self.start is None:
+            return flags
+        if self.last_battle is None:
+            if cur - self.start >= 19:
+                flags.append(f"开战 {cur - self.start} 回合无交火（≥19）")
+        elif cur - self.last_battle >= 39:
+            flags.append(f"最后交火距今 {cur - self.last_battle} 回合（≥39）")
+        if self.last_conquest is not None and cur - self.last_conquest >= 49:
+            flags.append(f"已 {cur - self.last_conquest} 回合无占领（≥49）")
+        if cur - self.start > 299:
+            flags.append(f"战争已 {cur - self.start} 回合（>299）")
+        return flags
+
+
+def front_assessment(front_lines: list, stale: list[str]) -> str:
+    """Front-line scoring + attack discipline (single-province >=10 to attack)."""
+    if not isinstance(front_lines, list) or not front_lines:
+        return "前线评估: 暂无前线信息（敌军远守或未接壤）——按征兵集结处理。"
+    lines = []
+    for f in front_lines[:8]:
+        my = int(f.get("my_units") or 0)
+        en = int(f.get("enemy_units") or 0)
+        if my >= 10 and my > en:
+            rec = "进攻吞并（碾压）"
+        elif my > 0:
+            rec = "对峙防守（兵力不足不打）"
+        else:
+            rec = "征兵补充"
+        lines.append(f"· 省{f.get('to')}(敌civ{f.get('civ')}): 我{my}/敌{en} → {rec}")
+    head = "前线评分: \n" + "\n".join(lines)
+    disc = "\n攻击纪律: 单省我方兵力≥10 且 > 敌省时才进攻；劣势只集结/征兵/防守。"
+    stal = ("\n⚠ 僵局信号: " + "；".join(stale) + "\n建议启用 peace_treaty 止损（向交战方求和，等待对方接受）。") if stale else ""
+    return head + disc + stal
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default=str(REPO / "config.yaml"))
@@ -163,6 +223,8 @@ def main():
     last_executed = -1
     hud_last_push = 0.0
     last_war_turn = -1
+    war_trk = WarTracker()
+    prev_provinces = 0
     try:
         while True:
             st = json.loads(bridge.state())
@@ -210,6 +272,9 @@ def main():
                     time.sleep(5)
                     continue
                 print(f"WAR TURN {cur}: single-call war decision", flush=True)
+                war_trk.on_turn(cur)
+                stale = war_trk.stalemate_flags(cur)
+                assessment = front_assessment(st.get("front_lines", []), stale)
                 history = build_history(session_dir)
                 ctx = build_turn_context(st, history)
                 strat = read_strategy(game_root)
@@ -218,6 +283,7 @@ def main():
                 ctx = (f"{ledger_line(ledger)}\n{phase_note}\n"
                        + set_msg_lines(ctx_store, st)
                        + ctx
+                       + "\n" + assessment
                        + mech_prompts.war_turn_closing())
                 try:
                     raw = provider.chat(WAR_SYSTEM_PROMPT, ctx, temperature=0.3, max_tokens=8000)
@@ -234,6 +300,8 @@ def main():
                                         temperature=0.3, max_tokens=8000)
                     war_actions = parse_actions(raw)
                 results = execute(bridge, war_actions)
+                war_trk.note_results(cur, results, prev_provinces, st.get("provinces", 0))
+                prev_provinces = st.get("provinces", 0)
                 ok_n = sum(1 for r in results if str(r["result"]).startswith("OK"))
                 print(f"  war actions {ok_n}/{len(results)} ok: "
                       f"{[r['action'] for r in results]}", flush=True)
