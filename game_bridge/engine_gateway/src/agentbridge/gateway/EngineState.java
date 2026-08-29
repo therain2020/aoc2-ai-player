@@ -393,7 +393,7 @@ final class EngineState {
                 } catch (Throwable ignored) {
                 }
             }
-            sb.append(tc).append("],");
+            sb.append(tc).append("]");
 
             // contract extras — diplomacy_points (guarded)
             try {
