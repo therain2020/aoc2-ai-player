@@ -164,15 +164,15 @@
 
 **Independent Test**: 无突发 10 回合决策调用 ≤6（turns.jsonl 计数）；金 <3×净收入回合数 ≤2；单次决策上下文 ≤6000 token；dashboard 计划面板显示文字愿景
 
-- [ ] R001 [P] [US1] 决策节拍器 `agent/mechanics/cadence.py`：常规每 2 回合 + 关键事件即时（wars 转变/领土损失/决策消息 sig/战略变化/愿景到期）→ `should_decide(st, last_turn)`
-- [ ] R002 [P] [US1] 愿景生成器 `agent/mechanics/vision.py`：`generate_vision(...)` 输出 {brief≤120字/10回合方向}, 每 10 回合或触发重生成；替换 plan.json 旧动作级结构（保留 base_turn/generated_turn/trigger）
-- [ ] R003 [P] [US1] 储备守卫 `agent/mechanics/reserve.py`：`gold_floor = 3×净收入`（负/近负=近 5 回合均值×3，下限 0）；`reserve_guard(st)` 击穿判定（SC-011）→ 击穿时决策上下文注入"修复收入/收缩开支"优先提示
-- [ ] R004 [P] [US1] DecisionContext 精炼 `agent/state.py`：白名单字段（台账/资源速查摘要/胜利进展压缩行/危险信号/前线评分/战术建议/常驻关系+历史追加行）；`ctx_token_size()` 审计 ≤6000（超限=历史 limit+邻国截断），移除叙事性铺陈
-- [ ] R005 [P] [US1] prompts 重构 `agent/mechanics/prompts.py`：`build_vision_system()`（愿景）+ `build_turn_system(gear_idx)`（每回合决策，含储备线/速查/建议）+ war 不变
-- [ ] R006 [US1] 主循环接线 `agent/main.py`：cadence 驱动（每循环 should_decide → LLM 决策[vision 到期先愿景] → execute(value_normalizer) → reserve_guard 记录 → endTurn）；删除 plan['turns'] 动作消费与 fill/enrich 对 turns 的依赖（enrich 转入决策 ctx）
-- [ ] R007 [P] [US1] `agent/mechanics/intent_writer.py` 适配：意图注入点从 plan 回合转为"决策输出动作"（决策后注入），防重复逻辑保留
-- [ ] R008 [P] [US1] dashboard 计划面板改渲染愿景（`narrator/dashboard.py` /api/plan + 前端卡片仅显示 brief/tactic 状态）
-- [ ] R009 [P] [US1] 测试 `tests/test_cadence.py`（2 回合节拍+5 类事件触发）、`tests/test_reserve.py`（floor 公式/击穿/负收入）、`tests/test_vision.py`（愿景格式/重生成触发）
+- [x] R001 [P] [US1] 决策节拍器 `agent/mechanics/cadence.py`：常规每 2 回合 + 关键事件即时（wars 转变/领土损失/决策消息 sig/战略变化/愿景到期）→ `should_decide(st, last_turn)`
+- [x] R002 [P] [US1] 愿景生成器 `agent/mechanics/vision.py`：`generate_vision(...)` 输出 {brief≤120字/10回合方向}, 每 10 回合或触发重生成；替换 plan.json 旧动作级结构（保留 base_turn/generated_turn/trigger）
+- [x] R003 [P] [US1] 储备守卫 `agent/mechanics/reserve.py`：`gold_floor = 3×净收入`（负/近负=近 5 回合均值×3，下限 0）；`reserve_guard(st)` 击穿判定（SC-011）→ 击穿时决策上下文注入"修复收入/收缩开支"优先提示
+- [x] R004 [P] [US1] DecisionContext 精炼 `agent/state.py`：白名单字段（台账/资源速查摘要/胜利进展压缩行/危险信号/前线评分/战术建议/常驻关系+历史追加行）；`ctx_token_size()` 审计 ≤6000（超限=历史 limit+邻国截断），移除叙事性铺陈
+- [x] R005 [P] [US1] prompts 重构 `agent/mechanics/prompts.py`：`build_vision_system()`（愿景）+ `build_turn_system(gear_idx)`（每回合决策，含储备线/速查/建议）+ war 不变
+- [x] R006 [US1] 主循环接线 `agent/main.py`：cadence 驱动（每循环 should_decide → LLM 决策[vision 到期先愿景] → execute(value_normalizer) → reserve_guard 记录 → endTurn）；删除 plan['turns'] 动作消费与 fill/enrich 对 turns 的依赖（enrich 转入决策 ctx）
+- [x] R007 [P] [US1] `agent/mechanics/intent_writer.py` 适配：意图注入点从 plan 回合转为"决策输出动作"（决策后注入），防重复逻辑保留
+- [x] R008 [P] [US1] dashboard 计划面板改渲染愿景（`narrator/dashboard.py` /api/plan + 前端卡片仅显示 brief/tactic 状态）
+- [x] R009 [P] [US1] 测试 `tests/test_cadence.py`（2 回合节拍+5 类事件触发）、`tests/test_reserve.py`（floor 公式/击穿/负收入）、`tests/test_vision.py`（愿景格式/重生成触发）
 - [ ] R010 [US1] 真机过检（quickstart §4b：节拍计数/SC-011 储备/≤6000 token 抽样）— 需游戏窗口（用户在场）
 
 **Checkpoint**: 决策范式切换完成——SC-001(新)/SC-005/SC-011 过检，vision 面板可读
