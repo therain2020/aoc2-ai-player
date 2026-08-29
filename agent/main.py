@@ -19,7 +19,7 @@ sys.path.insert(0, str(REPO))
 import yaml  # noqa: E402
 
 from agent.actions import (  # noqa: E402
-    execute, parse_actions, parse_plan, ActionError,
+    execute, parse_actions, parse_plan, SKILL_CAPS, ActionError,
 )
 from agent.bridge_client import wait_until_up, BridgeError  # noqa: E402
 from agent.llm import create_provider  # noqa: E402
@@ -51,14 +51,21 @@ _TECH_ORDER = ("research", "production", "eco_growth", "military_upkeep",
 
 
 def _auto_invest_tech(bridge, st):
-    """Engine-level fallback: spend all remaining tech points every turn."""
+    """Engine-level fallback: spend all remaining tech points every turn.
+
+    T037: skip categories already at their cap (docs/mechanics.md M-TECH
+    SKILL_CAPS) instead of probing the engine to discover the limit.
+    """
     pts = int(st.get("tech_points", 0) or 0)
     if pts <= 0:
         return
+    skills = st.get("skills") or {}
     spent = 0
     for cat in _TECH_ORDER:
         if pts <= 0:
             break
+        if int(skills.get(cat, 0) or 0) >= SKILL_CAPS.get(cat, 99):
+            continue
         r = bridge.invest_tech(cat, pts)
         if str(r).startswith("OK"):
             done = 0

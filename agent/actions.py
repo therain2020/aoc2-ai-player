@@ -31,6 +31,9 @@ ACTION_SPEC = {
     "proclaim_independence": {"target_civ_id": int},
     "prepare_for_war": {"target_civ_id": int, "against_civ_id": int},
     "call_to_arms": {"target_civ_id": int, "against_civ_id": int},
+    "assimilate": {"province_id": int, "num_of_turns": int},
+    "festival": {"province_id": int},
+    "colonize": {"province_id": int},
 }
 
 BUILDING_TYPES = ("fort", "farm", "library", "workshop", "armoury", "port", "supply")
@@ -39,6 +42,12 @@ TECH_CATEGORIES = (
     "pop_growth", "eco_growth", "taxation", "production",
     "administration", "military_upkeep", "research", "colonization",
 )
+
+# docs/mechanics.md M-TECH: per-category skill caps (SkillsManager 25/25/25/25/20/30/30/15)
+SKILL_CAPS = {
+    "pop_growth": 25, "eco_growth": 25, "taxation": 25, "production": 25,
+    "administration": 20, "military_upkeep": 30, "research": 30, "colonization": 15,
+}
 
 
 class ActionError(ValueError):
@@ -76,6 +85,9 @@ COST_TAGS = {
     "proclaim_independence": "diplo", # 10 外交点
     "prepare_for_war": "move",        # 备战集结：兵力投入
     "call_to_arms": "diplo",
+    "assimilate": "multi",    # 6 外交点 + 同化 cost 金
+    "festival": "multi",      # 8 行动点 + festivalCost 金
+    "colonize": "multi",      # 14 外交点 + 行动点 + 金（科技<0.8 惩罚 ×8.25）
 }
 
 
@@ -227,7 +239,9 @@ def actions_prompt_spec() -> str:
         "support_rebels{target_civ_id,gold} 扶植叛军(扣34+金,搅乱敌省) | ultimatum{target_civ_id} 通牒吞并傀儡(关系≤−10且24外交点) |\n"
         "civilize{target_civ_id} 开化(≥10外交点) | form_civilization 组建文明(24外交点+1000金) |\n"
         "proclaim_independence{target_civ_id} 独立宣言(扣10) | prepare_for_war{target_civ_id,against_civ_id} 命盟友备战 |\n"
-        "call_to_arms{target_civ_id,against_civ_id} 号召盟友参战\n"
+        "call_to_arms{target_civ_id,against_civ_id} 号召盟友参战 |\n"
+        "assimilate{province_id,num_of_turns} 同化敌对省(≥6外交点+钱,每省1单,10-50回合) |\n"
+        "festival{province_id} 办节日提幸福(8行动点+钱) | colonize{province_id} 殖民荒芜省(≥14外交点+行动点+钱)\n"
         "动作资源成本: " + " ".join(f"{k}={v}" for k, v in COST_TAGS.items()) + "\n"
         "规则：科技点尽量用完；保留≥1000金币储备；所有动作受【资源台账】预算约束"
         "（金/行动点/外交点存量+每回合收入）；brief=一句话中文战报。输出严格 JSON。"

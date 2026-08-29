@@ -10,7 +10,7 @@ Three layers:
 """
 from __future__ import annotations
 
-from agent.actions import ACTION_SPEC, actions_prompt_spec
+from agent.actions import ACTION_SPEC, TECH_CATEGORIES, SKILL_CAPS, actions_prompt_spec
 from agent.mechanics import catalog
 
 
@@ -62,7 +62,7 @@ def plan_batch_spec() -> str:
         "⑤若金币<1500，只征兵/投科技点，不投资（保留金库）。\n"
         "科技点按当前阶段投放，不机械全倒：战争/备战→military_upkeep、research；和平→taxation、"
         "eco_growth、production；人口紧张→pop_growth；殖民地扩张→colonization；administration 按需。"
-        "各类封顶：25/25/25/25/20/30/30/15，封顶后换下一类。"
+        "各类封顶：" + "/".join(str(SKILL_CAPS[c]) for c in TECH_CATEGORIES) + "，封顶后换下一类。"
     )
 
 
