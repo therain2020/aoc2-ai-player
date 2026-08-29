@@ -23,6 +23,8 @@ def sanitize_actions(actions: list[dict], st: dict) -> list[dict]:
             continue
     out: list[dict] = []
     declared = 0
+    recruits = 0
+    broke = float(st.get("money") or 0) < 0     # 破产：禁止再募兵（止血）
     for a in actions:
         if not isinstance(a, dict) or "action" not in a:
             continue
@@ -38,6 +40,11 @@ def sanitize_actions(actions: list[dict], st: dict) -> list[dict]:
             if declared >= 1:
                 continue                       # 每回合至多一次新宣战
             declared += 1
+            out.append(a)
+        elif n == "recruit_army":
+            if broke or recruits >= 2:         # 破产禁募 / 每回合至多 2 批
+                continue
+            recruits += 1
             out.append(a)
         else:
             out.append(a)

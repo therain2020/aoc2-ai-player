@@ -37,3 +37,14 @@ def test_single_declare_war_per_turn():
 def test_non_war_actions_pass_through():
     acts = [{"action": "recruit_army", "province_id": 1, "count": 100}]
     assert sanitize_actions(acts, _st()) == acts
+
+
+def test_bankrupt_blocks_recruit():
+    acts = [{"action": "recruit_army", "province_id": 1, "count": 100}]
+    st = _st(); st["money"] = -500
+    assert sanitize_actions(acts, st) == []
+
+
+def test_recruit_capped_two_batches():
+    acts = [{"action": "recruit_army", "province_id": i, "count": 400} for i in (1, 2, 3, 4)]
+    assert len(sanitize_actions(acts, _st())) == 2

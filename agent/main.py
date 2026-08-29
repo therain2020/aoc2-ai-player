@@ -454,6 +454,36 @@ def main():
                 print(f"WAR TURN {cur}: tactical orders (rule-driven blitz)", flush=True)
                 war_trk.on_turn(cur)
                 stale = war_trk.stalemate_flags(cur)
+                # 战败止损硬规则：我方战争分 ≤ -20 → 自动求和（引擎 AI 同款姿势）
+                my_score = -1
+                for w in st.get("wars", []) or []:
+                    try:
+                        my_score = int(w.get("my_score") or 0)
+                    except (TypeError, ValueError):
+                        continue
+                if my_score <= -20:
+                    target = None
+                    for n in st.get("neighbors", []):
+                        if n.get("war"):
+                            target = n.get("civ_id")
+                            break
+                    if target is not None:
+                        r = bridge.peace_treaty(target)
+                        print(f"  war-score {my_score} <-20 -> peace_treaty(civ{target}): {str(r)[:70]}",
+                              flush=True)
+                        round_append(session_dir, {
+                            "turn": cur, "ts": time.time(), "type": "war",
+                            "mechanic_phase": phase.phase_id, "tactic_ref": phase.tactic_ref,
+                            "ledger": ledger,
+                            "decision": [{"action": "peace_treaty", "target_civ_id": target}],
+                            "results": [{"action": "peace_treaty", "result": r}],
+                            "brief": "战争分≤-20 自动止损",
+                            "tokens": dict(provider.last_usage), "tokens_cum": dict(provider.total),
+                        })
+                        last_war_turn = cur
+                        bridge.end_turn()
+                        time.sleep(4)
+                        continue
                 # 僵局 -> 规则化和谈止损（不依赖 LLM）
                 if stale:
                     target = None
