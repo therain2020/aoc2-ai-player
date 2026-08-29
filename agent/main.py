@@ -746,6 +746,7 @@ def main():
                        + danger_note + reserve_note + "\n" + vision_line
                        + set_msg_lines(ctx_store, st)
                        + state_mod.battle_view(st) + "\n"
+                       + state_mod.expansion_candidates(st) + "\n"
                        + victory_progress(st, session_dir) + "\n")
             est = state_mod.ctx_token_estimate(primary)
             hist_limit = max(4, (state_mod.CTX_TOKEN_BUDGET - est) // 45)
@@ -792,6 +793,15 @@ def main():
             if injected:
                 print(f"  intent-added: {', '.join(injected)}", flush=True)
             actions = mech_sanitize.sanitize_actions(actions, st, fail_recruit_provs)
+            # 用户战略=军令必达：命令类战略（挑弱邻宣战）-> harness 直接补宣战动作
+            mandate = intent_writer.strategy_mandate(strat, st)
+            if mandate and not at_war:
+                iw_existing = {(a.get("action"), a.get("target_civ_id")) for a in actions}
+                for m in mandate:
+                    if (m["action"], m.get("target_civ_id")) not in iw_existing:
+                        actions.append(m)
+                        print(f"  ★ 军令执行: 用户战略宣战 → declare_war(civ{m['target_civ_id']})",
+                              flush=True)
             actions = value_normalizer.normalize_values(actions, st)
             results = execute(bridge, actions)
             for r in results:

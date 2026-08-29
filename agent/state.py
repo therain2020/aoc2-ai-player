@@ -196,6 +196,22 @@ def civ_big(n: dict) -> int:
     return n.get("civ_id") or -1
 
 
+def expansion_candidates(st: dict) -> str:
+    """可吞弱邻行（用户：愿景说吞并却无宣战——弱邻必须被显式标出）."""
+    me_u = int(st.get("units") or 0)
+    parts = []
+    for n in st.get("neighbors", []):
+        if n.get("allied") or n.get("war"):
+            continue
+        nu = int(n.get("units") or 0)
+        np_ = int(n.get("provinces") or 0)
+        if me_u > 0 and nu <= me_u * 0.65 and np_ > 0:
+            parts.append(f"civ{n.get('civ_id')}(军{nu}/省{np_}/关系{n.get('relation')})")
+    if not parts:
+        return ""
+    return "【扩张候选·闪电吞并】" + "、".join(parts[:5]) + "——无交战强敌时可宣战夺取（战机勿拖）"
+
+
 def battle_view(st: dict) -> str:
     """Agent-readable battlefield graph (user: the map is FOR THE AGENT).
 

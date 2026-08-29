@@ -170,6 +170,33 @@ def _front_province(st: dict, target: int | None) -> int:
     return _border_province(st)
 
 
+import re as _re
+
+
+def strategy_mandate(strategy_text: str, st: dict) -> list[dict]:
+    """USER STRATEGY = commander order（用户指挥必达）——"挑弱邻宣战"类命令
+    直接转化为动作，禁止愿景空转（2026-08-29 用户批评：战略说宣战 action 却落空）。"""
+    if not strategy_text:
+        return []
+    text = (strategy_text or "").replace(" ", "")
+    want_war = any(k in text for k in ("宣战", "吞并", "进攻", "征服", "开战", "攻打"))
+    if not want_war:
+        return []
+    # 弱邻目标：军/省 ≤ 我×0.65 且非盟友/非交战
+    me_u = int(st.get("units") or 0)
+    weak = None
+    for n in st.get("neighbors", []):
+        if n.get("allied") or n.get("war") or me_u <= 0:
+            continue
+        nu = int(n.get("units") or 0)
+        if nu <= me_u * 0.65:
+            weak = n.get("civ_id")
+            break
+    if weak is None:
+        return []
+    return [{"action": "declare_war", "target_civ_id": weak}]
+
+
 def enrich_actions(actions: list[dict], text: str, st: dict,
                    danger: dict | None = None) -> list[str]:
     """R007: inject immediately into a single-turn decision's action list."""

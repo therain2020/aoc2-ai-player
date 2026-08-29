@@ -54,6 +54,16 @@ def test_inject_budget_gates_and_dedup():
     assert notes3 == []
 
 
+def test_strategy_mandate_war_command():
+    st = {"units": 1000,
+          "neighbors": [{"civ_id": 90, "units": 400, "provinces": 5, "war": False, "allied": False},
+                        {"civ_id": 91, "units": 5000, "war": False, "allied": False}]}
+    m = iw.strategy_mandate("挑选一个弱小的邻国宣战", st)
+    assert m == [{"action": "declare_war", "target_civ_id": 90}]
+    assert iw.strategy_mandate("全力发展内政", st) == []
+    st2 = {"units": 1000, "neighbors": [{"civ_id": 91, "units": 5000, "war": False, "allied": False}]}
+    assert iw.strategy_mandate("宣战弱邻", st2) == []      # 无弱候选
+
 def test_enrich_preempt_when_weak_stabilizes():
     st = _st()   # civ89 3000 = 3x mine(1000) -> danger
     plan = {"turns": [{"offset": 1, "actions": []}, {"offset": 2, "actions": []}]}
