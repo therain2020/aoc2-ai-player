@@ -162,21 +162,6 @@ def test_victory_progress_block_contents(tmp_path):
     assert "省净+2" in line or "净+" in line
 
 
-def test_enrich_plan_for_threat_injects_actions():
-    from agent.main import _enrich_plan_for_threat
-    plan = {"turns": [{"offset": 1, "actions": []}, {"offset": 2, "actions": []},
-                      {"offset": 3, "actions": []}]}
-    # 我方劣势 -> 送礼+改善关系（不在动作里强行流血）
-    _enrich_plan_for_threat(plan, {"civ_id": 55, "units": 500, "mine": 100}, {"units": 100})
-    acts = [a["action"] for t in plan["turns"] for a in t.get("actions", [])]
-    assert acts == ["send_gift", "improve_relations"]
-    assert plan["turns"][0]["actions"][0]["target_civ_id"] == 55
-    plan2 = {"turns": [{"offset": 1, "actions": []}, {"offset": 2, "actions": []}]}
-    # 我方优势 -> 先发制人宣战
-    _enrich_plan_for_threat(plan2, {"civ_id": 60, "units": 90, "mine": 200}, {"units": 200})
-    assert plan2["turns"][0]["actions"][0]["action"] == "declare_war"
-
-
 def test_victory_progress_budget_sliders():
     from agent.state import victory_progress
     st = _sample_state()

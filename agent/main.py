@@ -29,6 +29,7 @@ from agent.state import (  # noqa: E402
     victory_progress,
 )
 from agent.mechanics import gears as mech_gears  # noqa: E402
+from agent.mechanics import intent_writer  # noqa: E402
 from agent.mechanics import phases as mech_phases  # noqa: E402
 from agent.mechanics import prompts as mech_prompts  # noqa: E402
 from agent.messages import (  # noqa: E402
@@ -177,42 +178,15 @@ def str_sig(s: str) -> str:
     return hashlib.md5((s or "").encode("utf-8")).hexdigest()
 
 
-RESPOND_ACTIONS = ("declare_war", "send_gift", "improve_relations",
-                   "buy_war", "coalition_war", "military_access_ask")
-
-
-def _plan_addresses(plan: dict, thr: dict) -> bool:
-    """Any response action in the plan (threat-target agnostic) counts as
-    addressed (2026-08-29: strict target matching caused constant re-plans)."""
+def _plan_has_response(plan: dict) -> bool:
+    """Plan already carries any threat-response/capability action (loose match)."""
     for t in plan.get("turns", []):
         for a in t.get("actions", []):
-            if a.get("action") in RESPOND_ACTIONS:
+            if a.get("action") in ("declare_war", "send_gift", "improve_relations",
+                                   "buy_war", "coalition_war", "military_access_ask",
+                                   "set_budget", "offer_alliance", "union_proposal"):
                 return True
     return False
-
-
-def _enrich_plan_for_threat(plan: dict, thr: dict | None, st: dict) -> None:
-    """Harness correction: LLM often writes the threat response into `brief`
-    but forgets the engine calls — inject them into the first turns.
-    军力≥1.1×敌 → 第2回合 declare_war；否则 第1回合 send_gift + 第3回合 improve_relations。"""
-    if not thr or not plan.get("turns") or _plan_addresses(plan, thr):
-        return
-    target = thr["civ_id"]
-    mine = int(st.get("units") or 0)
-    enemy_units = int(thr.get("units") or 0)
-    turns = plan["turns"]
-    first = turns[0]
-    if mine >= enemy_units * 1.1:
-        first.setdefault("actions", []).append(
-            {"action": "declare_war", "target_civ_id": target})
-        first["note"] = (first.get("note") or "") + "；先发制人宣战"
-    else:
-        first.setdefault("actions", []).append(
-            {"action": "send_gift", "target_civ_id": target, "gold": 300})
-        first["note"] = (first.get("note") or "") + "；送礼维稳"
-        if len(turns) > 2:
-            turns[2].setdefault("actions", []).append(
-                {"action": "improve_relations", "target_civ_id": target})
 
 
 def _pause_status(game_root: str) -> str:
@@ -512,7 +486,7 @@ def main():
                 if cur > planned_turn and st.get("provinces", 0) < base_prov:
                     print(f"EMERGENCY: provinces {base_prov} -> {st.get('provinces')}, re-planning", flush=True)
                     plan = None
-                if thr and (cur - last_danger_replan >= 5 or not _plan_addresses(plan, thr)):
+                if thr and (cur - last_danger_replan >= 5 or not _plan_has_response(plan)):
                     print(f"DANGER: civ{thr['civ_id']} units {thr['units']} >= {thr['ratio']}x mine -> re-plan",
                           flush=True)
                     plan = None
@@ -561,8 +535,11 @@ def main():
                 plan["base_provinces"] = st.get("provinces", 0)
                 plan["start_turn"] = cur
                 planned_turn = cur + len(plan["turns"]) - 1
-                # harness correction: brief-promised threat actions -> real steps
-                _enrich_plan_for_threat(plan, thr, st)
+                # harness intent-decomposer: brief promises (挑拨/联合统治/预算/威胁)
+                # -> capability steps injected into plan turns
+                injected = intent_writer.enrich(plan, plan["brief"], st, thr)
+                if injected:
+                    print(f"  intent-injected: {', '.join(injected)}", flush=True)
                 write_plan(session_dir, plan)
                 try:
                     plines = []
