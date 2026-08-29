@@ -51,8 +51,8 @@
 |---|---|---|
 | `gold` | 金币 | invest / invest_dev / move_capital |
 | `move` | 行动点 | recruit_army / move_army / disband_army / prepare_for_war |
-| `diplo` | 外交点 | offer_alliance / peace_treaty / send_insult / trade_request / nonaggression_pact / offer_vasalization / military_access_ask / military_access_give / improve_relations / decrease_relations / ultimatum / civilize / form_civilization / proclaim_independence / call_to_arms |
-| `multi` | 多资源 | declare_war / construct / send_gift / support_rebels |
+| `diplo` | 外交点 | offer_alliance / peace_treaty / send_insult / trade_request / nonaggression_pact / offer_vasalization / military_access_ask / military_access_give / improve_relations / decrease_relations / ultimatum / civilize / proclaim_independence / call_to_arms |
+| `multi` | 多资源 | declare_war / construct / send_gift / support_rebels / form_civilization / assimilate / festival / colonize |
 | `tech` | 科技点 | invest_tech |
 | `query` | 零成本查询 | （Agent 侧不使用，桥 /state 等为单独入口） |
 
