@@ -193,6 +193,23 @@ def git_build() -> str:
     return _BUILD_CACHE["hash"]
 
 
+def _war_opponent(st: dict, me: int) -> int | None:
+    """交战对手优先从 wars 列表取（neighbors war 标记可能缺失——1461 事件教训）。"""
+    for w in st.get("wars", []) or []:
+        if not isinstance(w, dict):
+            continue
+        try:
+            a = int(w.get("agg") or 0)
+            d = int(w.get("def") or 0)
+        except (TypeError, ValueError):
+            continue
+        if a == me:
+            return d if d and d != me else None
+        if d == me:
+            return a if a and a != me else None
+    return None
+
+
 def _pause_status(game_root: str) -> str:
     """Pause source summary at startup — NEVER auto-delete (user pauses are sacred)."""
     p = Path(game_root) / "aoc2_pause.txt"
@@ -461,11 +478,7 @@ def main():
                         _score = int(_w.get("my_score") or 0)
                     except (TypeError, ValueError):
                         pass
-                _tgt = None
-                for _n in st.get("neighbors", []):
-                    if _n.get("war"):
-                        _tgt = _n.get("civ_id")
-                        break
+                _tgt = _war_opponent(st, int(st.get("my_civ") or -1))
                 if _score >= 90 and _tgt is not None:
                     _r = bridge.peace_treaty(_tgt)
                     print(f"  ★ 收割求和: 胜利点{_score}≥90 → peace_treaty(civ{_tgt}): {str(_r)[:70]}",
@@ -521,11 +534,7 @@ def main():
                 if ("Message_WeCanSignPeace" in (st.get("msg_types") or "") or
                         "Message_PeaceTreaty" in (st.get("msg_types") or "")):
                     if my_score_now >= 20 and my_score_now < 95:
-                        tgt = None
-                        for n in st.get("neighbors", []):
-                            if n.get("war"):
-                                tgt = n.get("civ_id")
-                                break
+                        tgt = _war_opponent(st, int(st.get("my_civ") or -1))
                         if tgt is not None:
                             r = bridge.peace_treaty(tgt)
                             print(f"  敌求和 我+{my_score_now} → 接受锁定战果 peace_treaty(civ{tgt}): {str(r)[:70]}",
@@ -550,11 +559,7 @@ def main():
                     except (TypeError, ValueError):
                         continue
                 if my_score <= -20:
-                    target = None
-                    for n in st.get("neighbors", []):
-                        if n.get("war"):
-                            target = n.get("civ_id")
-                            break
+                    target = _war_opponent(st, int(st.get("my_civ") or -1))
                     if target is not None:
                         r = bridge.peace_treaty(target)
                         print(f"  war-score {my_score} <-20 -> peace_treaty(civ{target}): {str(r)[:70]}",
@@ -574,11 +579,7 @@ def main():
                         continue
                 # 僵局 -> 规则化和谈止损（不依赖 LLM）
                 if stale:
-                    target = None
-                    for n in st.get("neighbors", []):
-                        if n.get("war"):
-                            target = n.get("civ_id")
-                            break
+                    target = _war_opponent(st, int(st.get("my_civ") or -1))
                     if target is not None:
                         r = bridge.peace_treaty(target)
                         print(f"  stalemate -> peace_treaty(civ{target}): {str(r)[:80]}", flush=True)

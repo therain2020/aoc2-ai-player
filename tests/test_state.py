@@ -168,6 +168,14 @@ def test_git_build_returns_commit_ish():
     assert h and (h == "unknown" or len(h) >= 7)
 
 
+def test_war_opponent_from_wars_list():
+    from agent.main import _war_opponent
+    st = {"wars": [{"agg": 138, "def": 140, "war_score": -100, "my_score": 100}]}
+    assert _war_opponent(st, 138) == 140
+    assert _war_opponent(st, 140) == 138
+    assert _war_opponent({"wars": []}, 138) is None
+
+
 def test_empty_plan_superseded_by_cadence_flow():
     """旧批量计划已由范式切换替代（R006）；该测试验证 cadence 可正常判定节拍而非依赖 plan turns."""
     from agent.mechanics.cadence import CadenceTracker
