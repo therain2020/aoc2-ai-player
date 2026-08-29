@@ -175,25 +175,6 @@ def _validate_actions(raw_actions: list) -> list:
     return actions
 
 
-def plan_prompt_spec() -> str:
-    return (
-        "【批量计划模式】输出 JSON {brief: 总体方针一句话, turns: [10 个元素]}。"
-        "每个 turn 元素: {offset: 回合序号(1..10), actions: [动作数组], note: 本回合一句话计划}。\n"
-        "动作格式与单回合一致（见可用动作表）。前几回合通常先征兵/投资/投科技点，"
-        "中后期再进攻；相邻回合的动作要衔接（如先征兵后进攻需分回合）；"
-        "科技点只在第一回合用完（技术效果持续）；所有动作要符合当前的战略档位。\n"
-        "决策依据：对比邻国国力（省份/军队/人口/金币/科技）——邻国全面明显落后时是宣战窗口；"
-        "关系为敌方已交战时优先保卫；盟友（allied=true）不要进攻。\n"
-        "规则（引擎冷却）：①投资invest/investDev 同一省持续4回合窗口，同省间隔≥4回合，建议各省轮投；"
-        "②建造construct 完工周期约2-3回合，同一建筑未完工不可重复建，建议分省分建筑轮建；"
-        "③征兵recruit_army 每省当回合可批量一次，数量受可征兵上限（人口基数）与行动点约束；"
-        "④迁都move_capital 有50回合锁定，只可一次；⑤若金币<1500，只征兵/投科技点，不投资（保留金库）。\n"
-        "科技点按当前阶段投放，不机械全倒：战争/备战→military_upkeep、research；和平→taxation、"
-        "eco_growth、production；人口紧张→pop_growth；殖民地扩张→colonization；administration按需。"
-        "各类封顶：前四类25 政20 军费/科研30 殖民15，封顶后换下一类。"
-    )
-
-
 def actions_prompt_spec() -> str:
     """Describe the action space for the LLM system prompt."""
     return (

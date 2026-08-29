@@ -19,33 +19,22 @@ sys.path.insert(0, str(REPO))
 import yaml  # noqa: E402
 
 from agent.actions import (  # noqa: E402
-    execute, parse_actions, parse_plan, plan_prompt_spec, actions_prompt_spec, ActionError,
+    execute, parse_actions, parse_plan, ActionError,
 )
 from agent.bridge_client import wait_until_up, BridgeError  # noqa: E402
 from agent.llm import create_provider  # noqa: E402
 from agent.llm.base import LLMError  # noqa: E402
 from agent.state import build_history, build_turn_context, extract_ledger, ledger_line  # noqa: E402
 from agent.mechanics import phases as mech_phases  # noqa: E402
+from agent.mechanics import prompts as mech_prompts  # noqa: E402
 from agent.messages import decision_types, auto_types  # noqa: E402
 from agent.context_store import CtxStore  # noqa: E402
 from recorder.session import create_session  # noqa: E402
 
 CONFIG_GAME_ROOT = ""
 
-SYSTEM_PROMPT = (
-    "直接输出JSON，禁止输出任何思考过程或解释。你是《文明时代2》的战略玩家，"
-    "目标：安全扩张（先发展内政军备，实力超过邻国再宣战）。"
-) + actions_prompt_spec() + "\n\n" + plan_prompt_spec()
-
-WAR_SYSTEM_PROMPT = (
-    "直接输出JSON（{actions:[...], brief:\"...\"}），禁止任何思考过程或解释。"
-    "你是正在交战中的军队统帅。每回合 1-3 个动作，参考【前线】数据："
-    "move_army 只能从前线我方可攻击省（from）移动到相邻敌省（to）——"
-    "我方前线兵力大于敌省时进攻吞并（moveArmy到敌省会触发战斗），"
-    "前线兵力劣势时优先征兵补充、集结防守；整体劣势严重时 peace_treaty 求和止损"
-    "（向目标交战方发出停战提议，等待对方接受）。"
-    "不要投资/建设/结盟。"
-) + actions_prompt_spec()
+SYSTEM_PROMPT = mech_prompts.build_plan_system()
+WAR_SYSTEM_PROMPT = mech_prompts.build_war_system()
 
 
 def load_config(path: str) -> dict:
@@ -229,8 +218,7 @@ def main():
                 ctx = (f"{ledger_line(ledger)}\n{phase_note}\n"
                        + set_msg_lines(ctx_store, st)
                        + ctx
-                       + ("\n【战争状态】当前正与邻国交战。请给出下一回合的战争操作"
-                          "（1-3 个动作），重点：推进军队到前线、征募新兵、必要时和谈。"))
+                       + mech_prompts.war_turn_closing())
                 try:
                     raw = provider.chat(WAR_SYSTEM_PROMPT, ctx, temperature=0.3, max_tokens=8000)
                 except LLMError as e:
@@ -310,7 +298,7 @@ def main():
                 ctx = (f"{ledger_line(ledger)}\n{phase_note}\n"
                        + set_msg_lines(ctx_store, st)
                        + ctx
-                       + f"\n当前回合 {cur}。请一次性规划未来 10 回合（当前回合算第 1 回合）。")
+                       + mech_prompts.plan_turn_closing(cur))
                 try:
                     raw = provider.chat(SYSTEM_PROMPT, ctx, temperature=0.3, max_tokens=8000)
                 except LLMError as e:
