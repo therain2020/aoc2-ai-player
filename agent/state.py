@@ -213,40 +213,55 @@ def expansion_candidates(st: dict) -> str:
 
 
 def battle_view(st: dict) -> str:
-    """Agent-readable battlefield graph (user: the map is FOR THE AGENT).
+    """Agent-readable battlefield graph: one row per province (garrison desc).
 
-    Combines /state adjacency + armies_overview + front_lines into a compact
-    text map: my garrisons per province, move-legal edges (mine↔mine and
-    mine↔enemy), front-line pressure. The agent sees WHO touches WHOM and
-    WHERE the armies are — then decides gather/attack itself.
+    2026-08-29 user critique (5000-troop province never moved): the old view
+    listed garrisons, mine-edges and enemy-edges as three separate lines with
+    [:30]/[:24] truncation — the agent had to cross-reference two lists, and
+    the hot province's edges could silently be cut. New: each province row
+    carries its own garrison + both edge kinds (move legality), sorted by
+    garrison desc; high-garrison / enemy-bordered / front provinces are never
+    dropped, low-garrison interiors compress to one tail line.
     """
-    parts = []
+    me_civ = int(st.get("my_civ") or -1)
     armies = {int(a.get("prov")): int(a.get("army") or 0)
               for a in (st.get("armies_overview") or [])}
-    g = " ".join(f"{p}({n})" for p, n in sorted(armies.items()))
-    parts.append(f"【战场图】我方驻军: {g or '无'}")
-    # move-legal edges
-    my_edges = []
-    enemy_edges = []
+    my_n: dict[int, list[int]] = {}
+    en_n: dict[int, list[tuple[int, int]]] = {}      # prov -> [(nbr, civ)]
     for a in st.get("adjacency") or []:
-        if int(a.get("civ") or 0) == int(st.get("my_civ", -1)):
-            my_edges.append((int(a["mine"]), int(a["nbr"])))
+        try:
+            m, n, c = int(a["mine"]), int(a["nbr"]), int(a.get("civ") or -1)
+        except (TypeError, ValueError):
+            continue
+        if c == me_civ:
+            my_n.setdefault(m, []).append(n)
+            my_n.setdefault(n, []).append(m)
         else:
-            enemy_edges.append((int(a["mine"]), int(a["nbr"]), int(a.get("civ") or -1)))
-    if my_edges:
-        parts.append("可调动(我方邻接): " + ", ".join(f"{a}↔{b}" for a, b in my_edges[:30]))
-    if enemy_edges:
-        parts.append("可进攻(对敌边境): " + ", ".join(
-            f"{a}→{b}(civ{c})" for a, b, c in enemy_edges[:24]))
+            en_n.setdefault(m, []).append((n, c))
+    fronts = st.get("front_lines") or []
+    froms = {int(f.get("from")) for f in fronts}
+    provs_ranked = sorted(set(armies) | set(my_n) | set(en_n) | froms,
+                          key=lambda p: (-armies.get(p, 0), p))
+    core = [p for p in provs_ranked if p in en_n or armies.get(p, 0) >= 500 or p in froms]
+    rest = [p for p in provs_ranked if p not in core]
+    rows = []
+    for p in core[:32]:
+        g = armies.get(p, 0)
+        row = f"省{p}(军{g})"
+        if my_n.get(p):
+            row += " 我邻[" + "-".join(map(str, sorted(my_n[p]))) + "]"
+        if en_n.get(p):
+            row += " 敌邻[" + "".join(f"{n}civ{c}" for n, c in sorted(en_n[p])) + "]"
+        if p in froms and g < 50:
+            row += " 告急"
+        rows.append(row)
+    parts = ["【战场图】(每省一行,按驻军降序; 我邻=可调动边, 敌邻=可进攻边):\n" + "\n".join(rows)]
+    if rest:
+        parts.append("腹地低兵省(军<500 无接敌): " + ",".join(map(str, rest[:40])))
     # front pressure (< 50 my units at a front province => breach risk)
-    weak = []
-    for f in st.get("front_lines") or []:
-        frm = int(f.get("from"))
-        my_n = int(f.get("my_units")) if f.get("my_units") is not None else armies.get(frm, 0)
-        if my_n < 50:
-            weak.append(f"{frm}(我{my_n})")
+    weak = [f"{p}(我{armies.get(p, 0)})" for p in froms if armies.get(p, 0) < 50]
     if weak:
-        parts.append("告急走廊(我<50兵): " + ", ".join(weak[:12]) + " —— 优先在此征兵/驻防")
+        parts.append("告急走廊(我<50兵): " + ", ".join(weak[:12]) + " —— 优先调兵/征兵驻防")
     return "\n".join(parts)
 
 

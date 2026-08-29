@@ -188,14 +188,32 @@ def test_battle_view_agent_graph():
     from agent.state import battle_view
     st = _sample_state()
     st["my_civ"] = 4
-    st["armies_overview"] = [{"prov": 241, "army": 300}, {"prov": 242, "army": 100}]
+    st["armies_overview"] = [{"prov": 241, "army": 10}, {"prov": 242, "army": 100}]
     st["adjacency"] = [{"mine": 241, "nbr": 242, "civ": 4},
                        {"mine": 241, "nbr": 300, "civ": 55},
                        {"mine": 242, "nbr": 301, "civ": 55}]
     st["front_lines"] = [{"from": 241, "to": 300, "civ": 55, "my_units": 10, "enemy_units": 80}]
     view = battle_view(st)
-    for token in ("【战场图】", "241(300)", "可调动", "可进攻", "告急走廊", "241(我10)"):
+    for token in ("【战场图】", "省241(军10)", "我邻[242]", "敌邻[300civ55]",
+                  "可调动", "可进攻", "告急走廊", "241(我10)"):
         assert token in view, token
+
+
+def test_battle_view_high_garrison_first_and_never_cut():
+    # 用户 bug: 5000 兵省闲置。战场图必须(1)每省一行带自身邻接 (2)按驻军降序
+    # (3)高兵力/接敌/前线省永不被 [..:32] 截断丢失
+    from agent.state import battle_view
+    st = {"my_civ": 4,
+          "armies_overview": [{"prov": 30, "army": 5000}, {"prov": 20, "army": 1000},
+                              {"prov": 10, "army": 200}],
+          "adjacency": [{"mine": 20, "nbr": 30, "civ": 4},
+                        {"mine": 20, "nbr": 10, "civ": 4},
+                        {"mine": 10, "nbr": 100, "civ": 55}],
+          "front_lines": [{"from": 10, "to": 100, "civ": 55, "my_units": 200, "enemy_units": 400}]}
+    view = battle_view(st)
+    assert view.find("省30(军5000)") < view.find("省10(军200)")   # 驻军降序
+    assert "省30(军5000) 我邻[20]" in view                          # 省30 自带其可调动边
+    assert "省10(军200) 我邻[20] 敌邻[100civ55]" in view            # 前线省自带双邻
 
 
 def test_victory_progress_budget_sliders():

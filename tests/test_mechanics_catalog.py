@@ -72,6 +72,8 @@ def test_budget_guard_low_gold_blocks_gold_actions():
     # 信息提示语气（用户原则：给信息让 agent 权衡，不代为禁止）
     assert "金库提示" in guard and "请自行权衡" in guard and "不禁止" in guard
     assert "invest" in guard
+    # 诚实上下文：破库(<500)时征兵会被规则拒绝——agent 必须知道，否则反复征废动作
+    assert "征兵" in guard and "拒绝" in guard and "不要重复发征兵" in guard
     g_rich = prompts.budget_guard({"gold": 5000, "income": {"gold": 120, "diplo": 3}})
     assert g_rich == ""
     g_edge = prompts.budget_guard({"gold": 500, "income": {}})

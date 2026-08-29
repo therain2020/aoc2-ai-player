@@ -280,7 +280,8 @@ def front_assessment(front_lines: list, stale: list[str], st: dict | None = None
     when the bridge front_lines are empty (targets: enemy capital/provinces)."""
     if not isinstance(front_lines, list) or not front_lines:
         overview = _war_overview(st)
-        disc = ("\n攻击纪律: 单省我方兵力≥10 且 > 敌省时才进攻；劣势只集结/征兵/防守。"
+        disc = ("\n攻击纪律: 单省我方兵力≥10 且 > 敌省时才进攻；"
+                "劣势侧先沿【战场图】『我邻』从高兵力省调兵增援（move_army），调不动再征兵/防守。"
                 "\n（如前线明细缺失：先按敌首都方向推进，move_army 选择与我国边境省相邻的敌省。）")
         stal = ("\n⚠ 僵局信号: " + "；".join(stale) + "\n建议启用 peace_treaty 止损。") if stale else ""
         return overview + disc + stal
@@ -296,7 +297,8 @@ def front_assessment(front_lines: list, stale: list[str], st: dict | None = None
             rec = "征兵补充"
         lines.append(f"· 省{f.get('to')}(敌civ{f.get('civ')}): 我{my}/敌{en} → {rec}")
     head = "前线评分: \n" + "\n".join(lines)
-    disc = "\n攻击纪律: 单省我方兵力≥10 且 > 敌省时才进攻；劣势只集结/征兵/防守。"
+    disc = ("\n攻击纪律: 单省我方兵力≥10 且 > 敌省时才进攻；"
+            "劣势侧先沿【战场图】『我邻』从高兵力省调兵增援（move_army），调不动再征兵/防守。")
     stal = ("\n⚠ 僵局信号: " + "；".join(stale) + "\n建议启用 peace_treaty 止损（向交战方求和，等待对方接受）。") if stale else ""
     return head + disc + stal
 
