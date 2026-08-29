@@ -56,7 +56,9 @@ final class EngineActions {
             "offer_vasalization", "military_access_ask", "military_access_give",
             "improve_relations", "decrease_relations", "support_rebels", "ultimatum",
             "civilize", "form_civilization", "proclaim_independence",
-            "prepare_for_war", "call_to_arms"));
+            "prepare_for_war", "call_to_arms",
+            // 内政三动作 (T035)
+            "assimilate", "festival", "colonize"));
 
     static final class Result {
         final String result; // "OK" | "FAIL"
@@ -108,6 +110,9 @@ final class EngineActions {
         else if (n.equals("proclaimIndependence")) { n = "proclaim_independence"; }
         else if (n.equals("prepareForWar")) { n = "prepare_for_war"; }
         else if (n.equals("callToArms")) { n = "call_to_arms"; }
+        else if (n.equals("assimilate")) { n = "assimilate"; }
+        else if (n.equals("festival")) { n = "festival"; }
+        else if (n.equals("colonize")) { n = "colonize"; }
         else if (n.equals("assimilate")) { n = "assimilate"; }
         else if (n.equals("festival")) { n = "festival"; }
         else if (n.equals("colonize")) { n = "colonize"; }
@@ -171,6 +176,12 @@ final class EngineActions {
                 return prepareForWar(ps);
             } else if (n.equals("call_to_arms")) {
                 return callToArms(ps);
+            } else if (n.equals("assimilate")) {
+                return assimilate(ps);
+            } else if (n.equals("festival")) {
+                return festival(ps);
+            } else if (n.equals("colonize")) {
+                return colonize(ps);
             } else if (n.equals("new_game")) {
                 return newGame();
             } else if (n.equals("end_turn")) {
@@ -274,6 +285,15 @@ final class EngineActions {
             } else if (head.equals("callToArms")) {
                 ps.put("target_civ_id", Integer.parseInt(p[1]));
                 ps.put("against_civ_id", Integer.parseInt(p[2]));
+            } else if (head.equals("assimilate")) {
+                ps.put("province_id", Integer.parseInt(p[1]));
+                if (p.length > 2 && p[2].length() > 0) {
+                    ps.put("num_of_turns", Integer.parseInt(p[2]));
+                }
+            } else if (head.equals("festival")) {
+                ps.put("province_id", Integer.parseInt(p[1]));
+            } else if (head.equals("colonize")) {
+                ps.put("province_id", Integer.parseInt(p[1]));
             } else if (head.equals("loadGame")) {
                 ps.put("save_index", Integer.parseInt(p[1]));
             } else if (head.equals("toast")) {
@@ -715,6 +735,56 @@ final class EngineActions {
         EngineApi.call(EngineApi.cls(DIPLO), "sendCallToArms", target, me(), against);
         return ok("call_to_arms", "OK|callToArms|" + target + "|against|" + against,
                 detail("target", target, "against_civ_id", against));
+    }
+
+    // ---- 内政三动作 (T035，docs/mechanics.md L1；前置校验由引擎方法内置) ----
+
+    /** assimilate|province|turns — 同化（己方省/未占领/外交点≥6/钱≥cost；扣 6 外 + cost 金） */
+    private static Result assimilate(Map<String, Object> ps) {
+        int province = intP(ps, "province_id", "province");
+        int turns = ps.containsKey("num_of_turns") ? intP(ps, "num_of_turns") : 10;
+        int me = me();
+        int cost = 0;
+        try {
+            cost = ((Number) EngineApi.call(EngineApi.cls(DIPLO), "assimilateCost", province, turns)).intValue();
+        } catch (Throwable ignored) {
+        }
+        boolean okFlag = ((Boolean) EngineApi.call(EngineApi.cls(DIPLO), "addAssimilate",
+                me, province, turns)).booleanValue();
+        if (okFlag) {
+            return ok("assimilate", "OK|assimilate|" + province + "|" + turns,
+                    detail("province_id", province, "num_of_turns", turns, "cost", cost));
+        }
+        return fail("assimilate", "FAIL|assimilate|" + province + "|外交点<6/钱不足/非己有/已占领");
+    }
+
+    /** festival|province — 节日（行动点≥8 + 钱≥festivalCost；扣 8 行动点 + cost 金） */
+    private static Result festival(Map<String, Object> ps) {
+        int province = intP(ps, "province_id", "province");
+        int me = me();
+        int cost = 0;
+        try {
+            cost = ((Number) EngineApi.call(EngineApi.cls(DIPLO), "festivalCost", province)).intValue();
+        } catch (Throwable ignored) {
+        }
+        boolean okFlag = ((Boolean) EngineApi.call(EngineApi.cls(DIPLO), "addFestival",
+                me, province)).booleanValue();
+        if (okFlag) {
+            return ok("festival", "OK|festival|" + province, detail("province_id", province, "cost", cost));
+        }
+        return fail("festival", "FAIL|festival|" + province + "|行动点<8/钱不足/非己有");
+    }
+
+    /** colonize|province — 殖民荒芜省（殖民递进：外交点≥14 + 行动点 + 钱 + 邻接/军；科技<0.8 惩罚 ×8.25） */
+    private static Result colonize(Map<String, Object> ps) {
+        int province = intP(ps, "province_id", "province");
+        int me = me();
+        boolean okFlag = ((Boolean) EngineApi.call(EngineApi.cls(DIPLO),
+                "colonizeWastelandProvince", province, me)).booleanValue();
+        if (okFlag) {
+            return ok("colonize", "OK|colonize|" + province, detail("province_id", province));
+        }
+        return fail("colonize", "FAIL|colonize|" + province + "|行动点/外交点<14/钱不足/非荒芜或无可达");
     }
 
     /** newGame — legacy AgentBridge "newGame" case (idempotency guard ported) */

@@ -1,7 +1,7 @@
 # Agent 动作空间（权威速查表）
 
 > 同步源：`agent/actions.py :: ACTION_SPEC`。任何增删动作都必须同步此表
-> （宪法：文档-代码逐条一致）。当前动作总数：**27**。
+> （宪法：文档-代码逐条一致）。当前动作总数：**30**。
 
 ## 全部动作（AgentBridge `/action` 引擎直调）
 
@@ -34,6 +34,9 @@
 | `proclaim_independence` | target_civ_id | `sendGuaranteeIndependence_AskProposal(target, me, 40)` | 独立宣言请求；**−10 外交点**；接受→双方互不冲突/保障 |
 | `prepare_for_war` | target_civ_id, against_civ_id | `sendPrepareForWar(target, me, against, turns, me)` | 命盟友备战（AI 同款）：集结+征兵 3-6 回合 |
 | `call_to_arms` | target_civ_id, against_civ_id | `sendCallToArms(target, me, against)` | 号召盟友参战 |
+| `assimilate` | province_id, num_of_turns | `DiplomacyManager.addAssimilate(me, province, turns)` | **同化**：前置己方省/未占领/**外交点 ≥6**/钱 ≥ cost；−6 外交点 + cost 金；每省 1 单，10-50 回合 |
+| `festival` | province_id | `DiplomacyManager.addFestival(me, province)` | **节日**：**行动点 ≥8** + 钱 ≥ 500+税产×系数；−8 行动点 + cost 金；7 回合持续 +幸福 |
+| `colonize` | province_id | `DiplomacyManager.colonizeWastelandProvince(province, me)` | **殖民**：荒芜省 + 邻接/军队可达；**外交点 ≥14** + 行动点 + 钱；科技 <0.8 惩罚 ×8.25；产出 +5-20 军/初始人口 |
 
 非动作运营命令：`endTurn`(`gameAction.tryToTakeNexTurn()`)、`respondMessages`(removeMessage 倒序)、
 `toast`(`CFG.toast.setInView`)、`hud`、`plan`(PageDown 内存通道)、`enterGodView`(`CFG.FOG_OF_WAR=0`)、

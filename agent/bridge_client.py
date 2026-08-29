@@ -146,6 +146,17 @@ class BridgeClient:
     def call_to_arms(self, target_civ_id: int, against_civ_id: int) -> str:
         return self.action(f"callToArms|{target_civ_id}|{against_civ_id}")
 
+    # ---- 内政三动作 (T035) ----
+
+    def assimilate(self, province_id: int, num_of_turns: int = 10) -> str:
+        return self.action(f"assimilate|{province_id}|{num_of_turns}")
+
+    def festival(self, province_id: int) -> str:
+        return self.action(f"festival|{province_id}")
+
+    def colonize(self, province_id: int) -> str:
+        return self.action(f"colonize|{province_id}")
+
     def push_plan(self, text: str) -> str:
         return self._get("/plan?text=" + urllib.parse.quote(text, safe=""))
 
