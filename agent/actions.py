@@ -39,6 +39,9 @@ ACTION_SPEC = {
     # listRight.iDeclarWarOnCivID -> declareWar(对方, 目标)；iFormCoalitionAgainst -> 双方宣战+NAP40+通行40
     "buy_war": {"target_civ_id": int, "declare_war_on": int, "gold": int},
     "coalition_war": {"target_civ_id": int, "coalition_against": int, "gold": int},
+    # Budget 面板滑块（玩家等价操作，Menu_InGame_FlagAction_Budget）：
+    # 税收/商品/研究/投资 各 0-100；引擎 clamp（税0..1）+支出总和<=200%削减
+    "set_budget": {"tax_pct": int, "goods_pct": int, "research_pct": int, "invest_pct": int},
 }
 
 BUILDING_TYPES = ("fort", "farm", "library", "workshop", "armoury", "port", "supply")
@@ -95,6 +98,7 @@ COST_TAGS = {
     "colonize": "multi",      # 14 外交点 + 行动点 + 金（科技<0.8 惩罚 ×8.25）
     "buy_war": "multi",       # 金给目标 + 目标对 declare_war_on 宣战（引擎接受即执行）
     "coalition_war": "multi", # 金 + 双方同时对 coalition_against 宣战 + NAP40 + 通行40
+    "set_budget": "query",    # 预算面板整形（无直接资源消耗；影响税收入/支出占比）
 }
 
 

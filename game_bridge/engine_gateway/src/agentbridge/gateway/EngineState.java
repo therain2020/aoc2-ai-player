@@ -321,7 +321,10 @@ final class EngineState {
             }
             sb.append(neigh).append("],");
 
-            // front_lines (war borders, capped ~900 chars)
+            // front_lines (war borders, capped ~900 chars). Each entry is built
+            // in its own buffer with per-field guards: a failed getter must not
+            // corrupt the JSON (a partially-appended entry caused a parse
+            // failure on the war path — smoke run).
             sb.append("\"front_lines\":[");
             StringBuilder fl = new StringBuilder();
             try {
@@ -332,21 +335,40 @@ final class EngineState {
                     }
                     int nbSize = ((Integer) EngineApi.call(prov, "getNeighboringProvincesSize")).intValue();
                     for (int j2 = 0; j2 < nbSize; ++j2) {
-                        int ep = ((Integer) EngineApi.call(prov, "getNeighboringProvinces", j2)).intValue();
-                        int ec = ((Integer) EngineApi.call(EngineApi.call(game(), "getProvince", ep), "getCivID")).intValue();
-                        if (ec <= 0 || ec == me
-                                || !((Boolean) EngineApi.call(game(), "getCivsAtWar", me, ec)).booleanValue()) {
-                            continue;
+                        try {
+                            int ep = ((Integer) EngineApi.call(prov, "getNeighboringProvinces", j2)).intValue();
+                            int ec = ((Integer) EngineApi.call(EngineApi.call(game(), "getProvince", ep), "getCivID")).intValue();
+                            if (ec <= 0 || ec == me
+                                    || !((Boolean) EngineApi.call(game(), "getCivsAtWar", me, ec)).booleanValue()) {
+                                continue;
+                            }
+                            Object myArmy = null;
+                            Object enemyArmy = null;
+                            try {
+                                myArmy = EngineApi.call(prov, "getArmy", me);
+                            } catch (Throwable ignoredArmy) {
+                            }
+                            try {
+                                enemyArmy = EngineApi.call(
+                                        EngineApi.call(game(), "getProvince", ep), "getArmy", ec);
+                            } catch (Throwable ignoredArmy) {
+                            }
+                            if (myArmy == null || enemyArmy == null) {
+                                continue;
+                            }
+                            StringBuilder item = new StringBuilder();
+                            item.append("{\"from\":").append(pid)
+                                .append(",\"to\":").append(ep)
+                                .append(",\"civ\":").append(ec)
+                                .append(",\"my_units\":").append(myArmy)
+                                .append(",\"enemy_units\":").append(enemyArmy)
+                                .append("}");
+                            if (fl.length() > 0) {
+                                fl.append(',');
+                            }
+                            fl.append(item);
+                        } catch (Throwable ignoredEntry) {
                         }
-                        if (fl.length() > 0) {
-                            fl.append(',');
-                        }
-                        fl.append("{\"from\":").append(pid)
-                          .append(",\"to\":").append(ep)
-                          .append(",\"civ\":").append(ec)
-                          .append(",\"my_units\":").append(EngineApi.call(prov, "getArmy", me))
-                          .append(",\"enemy_units\":").append(EngineApi.call(EngineApi.call(game(), "getProvince", ep), "getArmy", ec))
-                          .append("}");
                     }
                 }
             } catch (Throwable ignored) {
@@ -439,6 +461,17 @@ final class EngineState {
                   .append(",\"gold_out\":").append(goldOut)
                   .append(",\"balance\":").append(balance)
                   .append(",\"diplo_delta\":").append(diploDelta)
+                  .append("}");
+            } catch (Throwable ignored) {
+            }
+            // contract extras — budget sliders (Budget 面板滑块，玩家等价可调)
+            try {
+                Object meCiv2 = EngineApi.call(game(), "getCiv", me);
+                sb.append(",\"budget\":{")
+                  .append("\"taxation\":").append(EngineApi.call(meCiv2, "getTaxationLevel"))
+                  .append(",\"goods\":").append(EngineApi.call(meCiv2, "getSpendings_Goods"))
+                  .append(",\"research\":").append(EngineApi.call(meCiv2, "getSpendings_Research"))
+                  .append(",\"investments\":").append(EngineApi.call(meCiv2, "getSpendings_Investments"))
                   .append("}");
             } catch (Throwable ignored) {
             }

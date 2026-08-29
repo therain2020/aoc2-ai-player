@@ -92,6 +92,17 @@ define(
     decide=lambda st, ctx: ({} if False else None),
 )
 
+define(
+    "BUDGET_TUNE",
+    # Budget 面板滑块（Menu_InGame_FlagAction_Budget，玩家等价）：
+    # 税收档=幸福感修正（AI_Style:3498 模板）+ 支出四滑块 商品/研究/投资/军费 ≤200% 引擎削减。
+    preconditions=lambda st: (True, "always settable"),
+    steps=[("set_budget", {"tax_pct": "ctx_tax", "goods_pct": "ctx_goods",
+                           "research_pct": "ctx_research", "invest_pct": "ctx_invest"})],
+    fallback="sliders clamped by engine",
+    decide=lambda st, ctx: None,  # 由 gear_policy 与幸福感规则填充（下一轮真机标定）
+)
+
 
 def capability_names() -> list[str]:
     return sorted(CAPABILITIES)

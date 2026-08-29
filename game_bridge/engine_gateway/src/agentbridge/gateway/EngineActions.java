@@ -60,7 +60,9 @@ final class EngineActions {
             // 内政三动作 (T035)
             "assimilate", "festival", "colonize",
             // 交易挑拨 (TradeRequest_GameData 双清单：LEFT=我方给金, RIGHT=对方宣誓战/联盟)
-            "buy_war", "coalition_war"));
+            "buy_war", "coalition_war",
+            // Budget 面板滑块（玩家等价操作；引擎 clamp，支出总和<=200%）
+            "set_budget"));
 
     static final class Result {
         final String result; // "OK" | "FAIL"
@@ -114,6 +116,7 @@ final class EngineActions {
         else if (n.equals("callToArms")) { n = "call_to_arms"; }
         else if (n.equals("buyWar")) { n = "buy_war"; }
         else if (n.equals("coalitionWar")) { n = "coalition_war"; }
+        else if (n.equals("setBudget")) { n = "set_budget"; }
         else if (n.equals("assimilate")) { n = "assimilate"; }
         else if (n.equals("festival")) { n = "festival"; }
         else if (n.equals("colonize")) { n = "colonize"; }
@@ -166,6 +169,8 @@ final class EngineActions {
                 return buyWar(ps);
             } else if (n.equals("coalition_war")) {
                 return coalitionWar(ps);
+            } else if (n.equals("set_budget")) {
+                return setBudget(ps);
             } else if (n.equals("improve_relations")) {
                 return improveRelations(ps);
             } else if (n.equals("decrease_relations")) {
@@ -626,6 +631,36 @@ final class EngineActions {
                     detail("target", target, "declare_war_on", warOn, "gold", gold));
         }
         return fail("buy_war", "FAIL|buyWar|" + target + "|外交点不足(需≥10)");
+    }
+
+    /** setBudget|tax|goods|research|invest — Budget 面板滑块（玩家等价）:
+     *  setTaxationLevel 0..1, setSpendings_Goods/Research/Investments, 随后刷新预算。 */
+    private static Result setBudget(Map<String, Object> ps) {
+        int me = me();
+        Object civ = civ(me);
+        float tax = intP(ps, "tax") / 100.0f;
+        float goods = intP(ps, "goods") / 100.0f;
+        float research = intP(ps, "research") / 100.0f;
+        float invest = intP(ps, "invest") / 100.0f;
+        EngineApi.call(civ, "setTaxationLevel", Float.valueOf(tax));
+        EngineApi.call(civ, "setSpendings_Goods", Float.valueOf(goods));
+        EngineApi.call(civ, "setSpendings_Research", Float.valueOf(research));
+        EngineApi.call(civ, "setSpendings_Investments", Float.valueOf(invest));
+        try {
+            int budget = ((Number) EngineApi.get(civ, "iBudget")).intValue();
+            EngineApi.call(EngineApi.cls("age.of.civilizations2.jakowski.lukasz.Game_NextTurnUpdate"),
+                    "updateSpendingsOfCiv", me, Integer.valueOf(budget));
+            EngineApi.call(EngineApi.cls("age.of.civilizations2.jakowski.lukasz.Game_NextTurnUpdate"),
+                    "getBalance_UpdateBudget_Prepare", Integer.valueOf(me));
+        } catch (Throwable refreshIgnored) {
+        }
+        return ok("set_budget",
+                "OK|setBudget|tax=" + ((Number) EngineApi.call(civ, "getTaxationLevel")).floatValue()
+                        + "|goods=" + ((Number) EngineApi.call(civ, "getSpendings_Goods")).floatValue()
+                        + "|research=" + ((Number) EngineApi.call(civ, "getSpendings_Research")).floatValue()
+                        + "|invest=" + ((Number) EngineApi.call(civ, "getSpendings_Investments")).floatValue(),
+                detail("tax_pct", tax * 100, "goods_pct", goods * 100,
+                        "research_pct", research * 100, "invest_pct", invest * 100));
     }
 
     /** coalitionWar|target|against|gold — 给金组联合阵线：双方对 against 宣战 + NAP40 + 军事通行40. */

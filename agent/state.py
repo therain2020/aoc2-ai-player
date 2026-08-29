@@ -150,6 +150,12 @@ def victory_progress(st: dict, session_dir: Path | None = None) -> str:
     ge = st.get("game_end")
     ended = ge is True or (isinstance(ge, dict) and ge.get("ended") is True)
     parts.append("终局信号: 无" if not ended else "终局信号: 已终局(停止行动)")
+    bgt = st.get("budget") or {}
+    if bgt:
+        def _pct(v):
+            return "?" if v is None else f"{round(float(v) * 100)}%"
+        parts.append(f"预算(可调): 税{_pct(bgt.get('taxation'))} 商品{_pct(bgt.get('goods'))} "
+                     f"研究{_pct(bgt.get('research'))} 投资{_pct(bgt.get('investments'))}")
     return "；".join(parts)
 
 

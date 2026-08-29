@@ -163,6 +163,9 @@ class BridgeClient:
     def coalition_war(self, target_civ_id: int, coalition_against: int, gold: int) -> str:
         return self.action(f"coalitionWar|{target_civ_id}|{coalition_against}|{gold}")
 
+    def set_budget(self, tax_pct: int, goods_pct: int, research_pct: int, invest_pct: int) -> str:
+        return self.action(f"setBudget|{tax_pct}|{goods_pct}|{research_pct}|{invest_pct}")
+
     def push_plan(self, text: str) -> str:
         return self._get("/plan?text=" + urllib.parse.quote(text, safe=""))
 

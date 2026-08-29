@@ -151,6 +151,15 @@ def test_victory_progress_block_contents(tmp_path):
     assert "省净+2" in line or "净+" in line
 
 
+def test_victory_progress_budget_sliders():
+    from agent.state import victory_progress
+    st = _sample_state()
+    st["budget"] = {"taxation": 0.45, "goods": 0.3, "research": 0.15, "investments": 0.1}
+    line = victory_progress(st, None)
+    assert "预算(可调)" in line
+    assert "税45%" in line and "研究15%" in line and "投资10%" in line
+
+
 def test_threat_scan_war_flag_override():
     st = _sample_state()
     st["units"] = 100
