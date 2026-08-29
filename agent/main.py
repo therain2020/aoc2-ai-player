@@ -444,6 +444,7 @@ def main():
                     ctx = f"【用户战略指示】{strat}\n" + ctx
                 ctx = (f"{ledger_line(ledger)}\n{mech_prompts.budget_guard(ledger)}\n{phase_note}\n"
                        + set_msg_lines(ctx_store, st)
+                       + victory_progress(st, session_dir) + "\n"
                        + ctx
                        + "\n" + assessment
                        + mech_prompts.war_turn_closing())
@@ -463,6 +464,14 @@ def main():
                         record_skip(cur, phase, ledger, f"war invalid x2: {e2}")
                         continue
                 fail_streak = 0
+                if not war_actions:
+                    # war branch guard: an empty war decision must NOT go idle —
+                    # mobilize instead (fill with a scaled recruit)
+                    provs = st.get("my_provinces") or [0]
+                    war_actions = [{"action": "recruit_army", "province_id": int(provs[0]),
+                                    "count": 500}]
+                    print("  war empty decision -> auto-mobilize recruit(500)", flush=True)
+                war_actions = value_normalizer.normalize_values(war_actions, st)
                 results = execute(bridge, war_actions)
                 war_trk.note_results(cur, results, prev_provinces, st.get("provinces", 0))
                 prev_provinces = st.get("provinces", 0)

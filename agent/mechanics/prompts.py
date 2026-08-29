@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from agent.actions import ACTION_SPEC, TECH_CATEGORIES, SKILL_CAPS, actions_prompt_spec
 from agent.mechanics import catalog
+from agent.mechanics.gears import GEAR_POLICY, gear_policy
 
 
 def _known_ops(ops: list[str]) -> tuple[list[str], int]:
@@ -41,9 +42,16 @@ def mechanic_guidance(*ids: str) -> str:
     return "\n".join(lines)
 
 
-def plan_batch_spec() -> str:
-    """Batch-plan mode spec: 10-turn {brief, turns[...]} with tactic_ref + principles."""
-    return (
+def plan_batch_spec(gear_idx: int | None = None) -> str:
+    """Batch-plan mode spec: 10-turn {brief, turns[...]} with tactic_ref + principles.
+
+    gear_idx (1-6) injects the gear-execution policy (agent/mechanics/gears.py):
+    which engine APIs the current gear intends to use and what is taboo.
+    """
+    gear_part = ""
+    if gear_idx and gear_idx in GEAR_POLICY:
+        gear_part = gear_policy(gear_idx) + "\n"
+    return gear_part + (
         "【批量计划模式】输出 JSON {brief: 总体方针一句话, turns: [10 个元素]}。"
         "每个 turn 元素: {offset: 回合序号(1..10), actions: [动作数组], note: 本回合一句话计划, "
         "tactic_ref: 可选的机制 id（见下方机制引导）}。\n"
@@ -76,24 +84,28 @@ def plan_batch_spec() -> str:
     )
 
 
-def build_plan_system() -> str:
+def build_plan_system(gear_idx: int | None = None) -> str:
     return (
         "直接输出JSON，禁止输出任何思考过程或解释。你是《文明时代2》的战略玩家，"
         "目标：安全扩张（先发展内政军备，实力超过邻国再宣战）；一切决策服务获胜条件。\n\n"
         + actions_prompt_spec()
         + "\n\n"
-        + plan_batch_spec()
+        + plan_batch_spec(gear_idx)
     )
 
 
 def build_war_system() -> str:
     return (
         "直接输出JSON（{actions:[...], brief:\"...\"}），禁止任何思考过程或解释。"
-        "你是正在交战中的军队统帅。每回合 1-3 个动作，参考【前线】数据："
-        "move_army 只能从前线我方可攻击省（from）移动到相邻敌省（to）——"
-        "我方前线兵力大于敌省时进攻吞并（moveArmy 到敌省会触发战斗），"
-        "前线兵力劣势时优先征兵补充、集结防守；整体劣势严重时 peace_treaty 求和止损"
-        "（向目标交战方发出停战提议，等待对方接受）。不要投资/建设/结盟。\n"
+        "你是正在交战中的军队统帅——目标：打赢战争，不是维持现状。每回合 1-3 个动作，战争纪律：\n"
+        "① 动员暴兵：只要在前线兵力劣势或要发动攻势，每回合一处征兵（count 按国库规模，几万金就招成百上千）；"
+        "和平期省下的钱现在就是士兵。\n"
+        "② 前线调度：参考【前线】我方 vs 敌省兵力——我方≥10 且>敌省则 move_army 进攻吞并；"
+        "劣势则集结不动，兵补齐再打；主力集中一条战线，勿分散。\n"
+        "③ 反击：敌人进入我方纵深省份（我方失去省）→ 立即组织反击/重夺（move_army 反向夺回），"
+        "或在其薄弱侧翼开辟新战线。\n"
+        "④ 僵局/整体劣势：参考【危险信号】与战争分数（僵局 39/49/299 回合无进展）→ peace_treaty 止损。\n"
+        "禁止投资/建设/结盟/慢速备战；【预算护栏】禁止金币动作，但**不限制征兵与军事移动**。\n"
         "机制引导（战争）:\n" + mechanic_guidance("war_cycle") + "\n" + actions_prompt_spec()
     )
 
