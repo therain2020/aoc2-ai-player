@@ -30,6 +30,7 @@ from agent.state import (  # noqa: E402
 )
 from agent.mechanics import gears as mech_gears  # noqa: E402
 from agent.mechanics import intent_writer  # noqa: E402
+from agent.mechanics import value_normalizer  # noqa: E402
 from agent.mechanics import phases as mech_phases  # noqa: E402
 from agent.mechanics import prompts as mech_prompts  # noqa: E402
 from agent.messages import (  # noqa: E402
@@ -574,8 +575,17 @@ def main():
                 continue
             entry = plan["turns"][idx]
             entry_actions = entry["actions"]
+            if not entry_actions:
+                # empty plan turn is NOT a failure (user critique: 0/0 -> replan storm)
+                print(f"turn {cur}: empty plan turn -> skip (endTurn)", flush=True)
+                last_executed = cur
+                bridge.end_turn()
+                time.sleep(4)
+                continue
             print(f"--- executing turn {cur} (plan {entry['note'] or ''}) ---", flush=True)
 
+            # ledger-aware value scaling (engine-cost normalization)
+            entry_actions = value_normalizer.normalize_values(entry_actions, st)
             results = execute(bridge, entry_actions)
             ok_state = [r for r in results if result_ok(r["result"])]
             print(f"  executed {len(ok_state)}/{len(results)} ok", flush=True)
