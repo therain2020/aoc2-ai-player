@@ -19,8 +19,12 @@ sys.path.insert(0, str(REPO))
 import yaml  # noqa: E402
 
 from agent.actions import (  # noqa: E402
-    execute, parse_actions, parse_plan, result_ok, SKILL_CAPS, ActionError,
+    execute, parse_actions, result_ok, SKILL_CAPS, ActionError,
 )
+from agent.mechanics import cadence as mech_cadence  # noqa: E402
+from agent.mechanics import reserve as mech_reserve  # noqa: E402
+from agent.mechanics import vision as mech_vision  # noqa: E402
+from agent import state as state_mod  # noqa: E402
 from agent.bridge_client import wait_until_up, BridgeError  # noqa: E402
 from agent.llm import create_provider  # noqa: E402
 from agent.llm.base import LLMError  # noqa: E402
@@ -114,18 +118,6 @@ def read_strategy(game_root: str) -> str:
     return ""
 
 
-def read_plan(session_dir: Path):
-    p = session_dir / "plan.json"
-    if not p.exists():
-        return None
-    return json.loads(p.read_text(encoding="utf-8"))
-
-
-def write_plan(session_dir: Path, plan: dict):
-    (session_dir / "plan.json").write_text(
-        json.dumps(plan, ensure_ascii=False, indent=1), encoding="utf-8")
-
-
 def round_append(session_dir: Path, record: dict):
     with open(session_dir / "turns.jsonl", "a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -178,41 +170,6 @@ def set_msg_lines(ctx_store, st) -> str:
 def str_sig(s: str) -> str:
     import hashlib
     return hashlib.md5((s or "").encode("utf-8")).hexdigest()
-
-
-def _fill_empty_turns(plan: dict, st: dict) -> None:
-    """Root-cause fix for `0/0 -> replan`: LLM often omits actions for
-    repetitive turns (only note). Fill them instead of failing the plan."""
-    if not plan.get("turns"):
-        return
-    last_act = None
-    for t in plan["turns"]:
-        if t.get("actions"):
-            last_act = t["actions"][0]
-            continue
-        if int(st.get("tech_points") or 0) > 0:
-            t["actions"] = [{"action": "invest_tech", "category": "research", "count": 5}]
-            t["note"] = (t.get("note") or "") + "；[fill]投科技点"
-        elif last_act:
-            t["actions"] = [dict(last_act)]
-            t["note"] = (t.get("note") or "") + "；[fill]延续"
-        else:
-            provs = st.get("my_provinces") or [0]
-            t["actions"] = [{"action": "recruit_army",
-                             "province_id": int(provs[0]), "count": 50}]
-            t["note"] = (t.get("note") or "") + "；[fill]征兵守卫"
-        print(f"  filled empty turn {t['offset']} -> {t['actions'][0]['action']}", flush=True)
-
-
-def _plan_has_response(plan: dict) -> bool:
-    """Plan already carries any threat-response/capability action (loose match)."""
-    for t in plan.get("turns", []):
-        for a in t.get("actions", []):
-            if a.get("action") in ("declare_war", "send_gift", "improve_relations",
-                                   "buy_war", "coalition_war", "military_access_ask",
-                                   "set_budget", "offer_alliance", "union_proposal"):
-                return True
-    return False
 
 
 def _pause_status(game_root: str) -> str:
@@ -354,9 +311,6 @@ def main():
     base_dir = args.session_dir or config.get("session", {}).get("dir", "./sessions")
     session_dir = create_session(base_dir, "agent", f"run-{datetime.now().strftime('%H%M%S')}")
 
-    plan_cycles = 0
-    planned_turn = 0          # planned last turn absolute id
-    plan = None
     strategy_sig = ""
     last_executed = -1
     hud_last_push = 0.0
@@ -365,7 +319,8 @@ def main():
     prev_provinces = 0
     fail_streak = 0
     last_danger_replan = -99
-    last_war_strategic = -99
+    cadence = mech_cadence.CadenceTracker()
+    vision = None
 
     def record_skip(cur, phase, ledger, reason) -> None:
         """T043: LLM 失败/输出无效兜底——SKIP_TURN 确定性推进 + FAIL 标记；
@@ -437,8 +392,8 @@ def main():
                 print("[dbg] pause-gate", flush=True)
                 time.sleep(2)
                 continue
-            # keep balance/token HUD live even between plan executions
-            if time.time() - hud_last_push > 10 and plan is not None:
+            # keep balance/token HUD live periodically
+            if time.time() - hud_last_push > 10:
                 try:
                     uu = provider.last_usage
                     bal = provider.fetch_balance() if getattr(provider, "track_balance", False) else None
@@ -577,162 +532,130 @@ def main():
             if st.get("messages", 0) > 0:
                 kind = handle_messages(bridge, ctx_store, st)
                 if kind == "decision":
-                    plan = None          # fresh plan/decision this turn
+                    ctx_store.add_event("cadence_msg", st.get("msg_types", "")[:80])
                 time.sleep(1)
                 continue
 
-            # strategy changed by user (PageUp/Insert)? -> re-plan immediately
+            # strategy signature (cadence trigger when user changes strategy)
             strat = read_strategy(game_root)
             s_sig = str_sig(strat)
-            if plan is None or (strat and s_sig != strategy_sig):
-                plan = None
-                strategy_sig = s_sig
-
-            # emergency checks: territory lost OR hostile army overtakes mine.
-            # DANGER re-plans at most once per 3 turns, unless the current plan
-            # does NOT address the threat (cooldown prevents LLM burn loops).
             thr = threat_scan(st)
-            if plan is not None:
-                base_prov = plan.get("base_provinces", 0)
-                if cur > planned_turn and st.get("provinces", 0) < base_prov:
-                    print(f"EMERGENCY: provinces {base_prov} -> {st.get('provinces')}, re-planning", flush=True)
-                    plan = None
-                if thr and (cur - last_danger_replan >= 5 or not _plan_has_response(plan)):
-                    print(f"DANGER: civ{thr['civ_id']} units {thr['units']} >= {thr['ratio']}x mine -> re-plan",
-                          flush=True)
-                    plan = None
-                    last_danger_replan = cur
+            if thr and cur - last_danger_replan >= 5:
+                print(f"DANGER: civ{thr['civ_id']} units {thr['units']} >= {thr['ratio']}x mine", flush=True)
+                last_danger_replan = cur
 
-            if plan is None:
-                plan_cycles += 1
-                if args.max_plans and plan_cycles > args.max_plans:
-                    print(f"reached max-plans={args.max_plans}, stopping")
-                    break
-                history = build_history(session_dir)
-                ctx = build_turn_context(st, history)
-                danger_note = ""
-                soft = threat_scan(st, force_only=False)
-                if soft:
-                    danger_note = (f"【危险信号】邻国 civ{soft['civ_id']} 军力 = 我方×{soft['ratio']}"
-                                   f"（{soft['units']} vs {soft['mine']}）"
-                                   f"{'，已交战' if soft['war'] else '，关系为敌'}——"
-                                   "先发制人或送礼维稳，禁止躺平发展/缓慢备战。\n")
-                if strat:
-                    ctx = f"【用户战略指示】{strat}\n" + ctx
-                ctx = (f"{ledger_line(ledger)}\n{mech_prompts.budget_guard(ledger)}\n{phase_note}\n"
-                       + danger_note
-                       + set_msg_lines(ctx_store, st)
-                       + victory_progress(st, session_dir) + "\n"
-                       + ctx
-                       + mech_prompts.plan_turn_closing(cur))
-                # gear-aware system prompt: current gear's engine-API policy injected
-                plan_sys = mech_prompts.build_plan_system(mech_gears.gear_index(strat))
+            # ---- paradigm switch (spec-kit Phase 10): vision + cadence + per-turn decision ----
+            vision = mech_vision.read_vision(session_dir) if vision is None else vision
+            if vision is None or mech_vision.vision_expired(vision, cur):
                 try:
-                    raw = chat_with_fallback(provider, plan_sys, ctx)
-                except LLMError as e:
-                    record_skip(cur, phase, ledger, f"plan llm: {e}")
-                    continue
-                try:
-                    plan = parse_plan(raw)
-                except (ActionError, json.JSONDecodeError) as e:
-                    print(f"plan invalid ({e}), retrying once", flush=True)
-                    try:
-                        plan = parse_plan(chat_with_fallback(
-                            provider, plan_sys, ctx, "上次输出不合法，请严格按格式输出。"))
-                    except (ActionError, json.JSONDecodeError, LLMError) as e2:
-                        record_skip(cur, phase, ledger, f"plan invalid x2: {e2}")
-                        continue
-                fail_streak = 0
-                _fill_empty_turns(plan, st)
-                plan["base_provinces"] = st.get("provinces", 0)
-                plan["start_turn"] = cur
-                planned_turn = cur + len(plan["turns"]) - 1
-                # harness intent-decomposer: brief promises (挑拨/联合统治/预算/威胁)
-                # -> capability steps injected into plan turns
-                injected = intent_writer.enrich(plan, plan["brief"], st, thr)
-                if injected:
-                    print(f"  intent-injected: {', '.join(injected)}", flush=True)
-                write_plan(session_dir, plan)
-                try:
-                    plines = []
-                    for pt in plan["turns"]:
-                        act = " ".join(a["action"] for a in pt["actions"])
-                        plines.append(f"T+{pt['offset']} {pt.get('note','')[:36]} [{act}]")
-                    plan_text = "\n".join(["未来计划: " + plan["brief"][:30]] + plines)
-                    Path(game_root, "aoc2_plan.txt").write_text(plan_text, encoding="utf-8")
-                    bridge.push_plan(plan_text)
-                except Exception:
-                    pass
-                print(f"PLAN {plan['brief']} ({len(plan['turns'])} turns)", flush=True)
-                round_append(session_dir, {
-                    "turn": cur, "ts": time.time(), "type": "plan",
-                    "mechanic_phase": phase.phase_id, "tactic_ref": phase.tactic_ref,
-                    "ledger": ledger,
-                    "brief": plan["brief"], "plan": [{"offset": t["offset"], "note": t.get("note", "")} for t in plan["turns"]],
-                    "tokens": dict(provider.last_usage), "tokens_cum": dict(provider.total),
-                })
-                time.sleep(2)
-                continue
+                    vision = mech_vision.generate_vision(provider, st, session_dir, strat)
+                    mech_vision.write_vision(session_dir, vision)
+                    cadence.set_vision(cur)
+                    print(f"VISION [{vision['brief'][:70]}]", flush=True)
+                    round_append(session_dir, {
+                        "turn": cur, "ts": time.time(), "type": "vision",
+                        "mechanic_phase": phase.phase_id, "tactic_ref": phase.tactic_ref,
+                        "ledger": ledger, "brief": vision.get("brief", ""),
+                        "focus": vision.get("focus", []),
+                        "tokens": dict(provider.last_usage), "tokens_cum": dict(provider.total),
+                    })
+                    time.sleep(1)
+                except (LLMError, ActionError, json.JSONDecodeError) as e:
+                    print(f"vision failed ({e}); retry next turn", flush=True)
+                    vision = None
 
-            # execute the next planned turn (planned turn absolute id = start_turn + offset - 1)
-            start_turn = plan.get("start_turn", cur)
-            idx = 0
-            while idx < len(plan["turns"]) and cur >= start_turn + plan["turns"][idx]["offset"] - 1:
-                idx += 1
-            if idx >= len(plan["turns"]):
-                print("plan finished; re-planning", flush=True)
-                plan = None
-                time.sleep(2)
-                continue
-            entry = plan["turns"][idx]
-            entry_actions = entry["actions"]
-            if not entry_actions:
-                # empty plan turn is NOT a failure (user critique: 0/0 -> replan storm)
-                print(f"turn {cur}: empty plan turn -> skip (endTurn)", flush=True)
-                last_executed = cur
-                bridge.end_turn()
-                time.sleep(4)
-                continue
-            print(f"--- executing turn {cur} (plan {entry['note'] or ''}) ---", flush=True)
-
-            # ledger-aware value scaling (engine-cost normalization)
-            entry_actions = value_normalizer.normalize_values(entry_actions, st)
-            results = execute(bridge, entry_actions)
-            ok_state = [r for r in results if result_ok(r["result"])]
-            print(f"  executed {len(ok_state)}/{len(results)} ok", flush=True)
-            balance = provider.fetch_balance() if getattr(provider, "track_balance", False) else None
-            u = provider.last_usage
-            t = provider.total
-            token_toast = (f"Token 入{u.get('prompt_tokens',0)} 出{u.get('completion_tokens',0)}"
-                           f" | 累计 {t.get('prompt_tokens',0)/1e6:.3f}M+{t.get('completion_tokens',0)/1e6:.3f}M")
-            bridge.toast(f"[回合{cur}] {entry.get('note','')}")
-            bridge.toast(token_toast)
+            # cadence: 每 2 回合常规 + 关键事件即时（wars/领土/决策消息/战略/愿景到期）
+            dmsg = ""
             try:
-                hist_lines = build_history(session_dir, limit=0).splitlines()
-                bridge.hud(
-                    line1=(f"余额 ¥{balance:.2f}" if balance is not None else "余额 --")
-                          + f" ｜ Token 入{u.get('prompt_tokens',0)} 出{u.get('completion_tokens',0)}",
-                    line2=f"T{cur} {entry.get('note','')}",
-                    line3=hist_lines[-1] if hist_lines else "",
-                    line4=hist_lines[-2] if len(hist_lines) > 1 else "",
-                    line5=hist_lines[-3] if len(hist_lines) > 2 else "",
-                )
+                dmsg = ",".join(decision_types(st.get("msg_types", "")))
             except Exception:
                 pass
+            cadence.mark_decision_msg(dmsg)
+            strat_changed = bool(strat) and s_sig != strategy_sig
+            strategy_sig = s_sig
+            decide, why = cadence.should_decide(cur, st, strategy_changed=strat_changed)
+            if not decide:
+                print(f"  cadence {why or 'wait'} (T{cur})", flush=True)
+                last_executed = cur
+                bridge.end_turn()
+                time.sleep(3)
+                continue
+
+            print(f"--- T{cur} decision ({why}) ---", flush=True)
+            soft = threat_scan(st, force_only=False)
+            danger_note = (f"【危险信号】邻国 civ{soft['civ_id']} 军力=我方×{soft['ratio']}"
+                           f"（{soft['units']} vs {soft['mine']}）"
+                           f"{'，已交战' if soft['war'] else '，关系为敌'}——先发制人或送礼维稳。\n") if soft else ""
+            reserve_note = mech_reserve.reserve_line(st)
+            vision_line = f"【愿景】{vision['brief']}\n" if vision else ""
+            primary = (f"{ledger_line(ledger)}\n{mech_prompts.budget_guard(ledger)}\n{phase_note}\n"
+                       + danger_note + reserve_note + "\n" + vision_line
+                       + set_msg_lines(ctx_store, st)
+                       + victory_progress(st, session_dir) + "\n")
+            est = state_mod.ctx_token_estimate(primary)
+            hist_limit = max(4, (state_mod.CTX_TOKEN_BUDGET - est) // 45)
+            history = build_history(session_dir, limit=hist_limit)
+            ctx = build_turn_context(st, history)
+            if strat:
+                ctx = f"【用户战略指示】{strat}\n" + ctx
+            user_ctx = primary + ctx
+            turn_sys = mech_prompts.build_turn_system(mech_gears.gear_index(strat))
+            try:
+                raw = chat_with_fallback(provider, turn_sys, user_ctx)
+            except LLMError as e:
+                record_skip(cur, phase, ledger, f"decision llm: {e}")
+                continue
+            try:
+                actions = parse_actions(raw)
+            except (ActionError, json.JSONDecodeError) as e:
+                print(f"decision invalid ({e}), retrying once", flush=True)
+                try:
+                    actions = parse_actions(chat_with_fallback(
+                        provider, turn_sys, user_ctx, "上次输出不合法，请严格按格式输出。"))
+                except (ActionError, json.JSONDecodeError, LLMError) as e2:
+                    record_skip(cur, phase, ledger, f"decision invalid x2: {e2}")
+                    continue
+            fail_streak = 0
+            if not actions:
+                try:
+                    actions = parse_actions(chat_with_fallback(
+                        provider, turn_sys, user_ctx,
+                        "输出为空数组，违规——必须给出至少 1 个动作（最小动作：集结/征兵/前线移动）。"))
+                    print("  empty -> forced retry ok", flush=True)
+                except (ActionError, json.JSONDecodeError, LLMError):
+                    actions = []
+                    print("  empty -> suggestion orders (last resort)", flush=True)
+            src = "llm" if actions else "suggestion"
+            if not actions:
+                suggestion = war_planner.plan_war_turn(st) if at_war else None
+                actions = suggestion or [{"action": "recruit_army",
+                                          "province_id": int((st.get("my_provinces") or [0])[0]),
+                                          "count": 500}]
+            # R007 intent injection on decided actions (threat/brief promises)
+            injected = intent_writer.enrich_actions(actions, (vision or {}).get("brief", ""),
+                                                    st, thr)
+            if injected:
+                print(f"  intent-added: {', '.join(injected)}", flush=True)
+            actions = value_normalizer.normalize_values(actions, st)
+            results = execute(bridge, actions)
+            ok_n = sum(1 for r in results if result_ok(r["result"]))
+            print(f"  executed {ok_n}/{len(results)} ok ({src})", flush=True)
+            balance = provider.fetch_balance() if getattr(provider, "track_balance", False) else None
+            bridge.toast(f"[T{cur}] {ok_n}/{len(results)}")
+            reserve_rec = mech_reserve.reserve_guard(st, mech_reserve.gold_floor(st))
             round_append(session_dir, {
-                "turn": cur, "ts": time.time(),
+                "turn": cur, "ts": time.time(), "type": "decision",
                 "mechanic_phase": phase.phase_id, "tactic_ref": phase.tactic_ref,
-                "ledger": ledger,
+                "ledger": ledger, "source": src, "cadence": why,
                 "state": {k: st.get(k) for k in ("turn", "money", "provinces", "units", "move_points")},
                 "neighbors": st.get("neighbors", []),
-                "decision": entry_actions, "brief": entry.get("note", ""),
-                "results": results, "plan_brief": plan.get("brief"),
+                "decision": actions, "brief": why,
+                "results": results, "plan_brief": (vision or {}).get("brief", ""),
+                "reserve": reserve_rec,
                 "tokens": dict(provider.last_usage), "tokens_cum": dict(provider.total),
                 "balance": balance,
             })
-            if not ok_state:
-                print("turn fully failed; re-planning", flush=True)
-                plan = None
+            cadence.mark_decision(cur, st)
             try:
                 _auto_invest_tech(bridge, st)
             except Exception:

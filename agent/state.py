@@ -196,6 +196,30 @@ def civ_big(n: dict) -> int:
     return n.get("civ_id") or -1
 
 
+# FR-018: DecisionContext budget — 单次决策上下文 ≤6000 token（量级估算：中文≈字符/2）
+CTX_TOKEN_BUDGET = 6000
+
+
+def ctx_token_estimate(text: str) -> int:
+    return max(1, len(text or "") // 2)
+
+
+def trimmed_ctx(primary: str, history: str, budget: int = CTX_TOKEN_BUDGET) -> str:
+    """Whitelist-style compaction: primary (白名单关键区) always kept; history
+    lines trimmed from the tail until the estimate fits the budget."""
+    used = ctx_token_estimate(primary)
+    if used >= budget:
+        return primary[: budget * 2]
+    lines = (history or "").splitlines()
+    kept = []
+    for line in reversed(lines):
+        used += ctx_token_estimate(line) + 1
+        if used > budget:
+            break
+        kept.append(line)
+    return primary + ("\n" + "\n".join(reversed(kept)) if kept else "")
+
+
 def extract_ledger(st: dict) -> dict:
     """Resource budget line input (FR-017①): stock + per-turn income (if exposed).
 

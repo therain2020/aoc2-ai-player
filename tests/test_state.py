@@ -162,23 +162,12 @@ def test_victory_progress_block_contents(tmp_path):
     assert "省净+2" in line or "净+" in line
 
 
-def test_fill_empty_turns():
-    from agent.main import _fill_empty_turns
-    plan = {"turns": [{"offset": 1, "actions": [{"action": "invest", "province_id": 1, "gold": 500}]},
-                      {"offset": 2, "actions": [], "note": "继续"},
-                      {"offset": 3, "actions": []}]}
-    _fill_empty_turns(plan, {"tech_points": 0, "my_provinces": [7]})
-    assert plan["turns"][1]["actions"] == [{"action": "invest", "province_id": 1, "gold": 500}]
-    assert plan["turns"][1]["note"].endswith("[fill]延续")
-    # 延续链：后续空回合同样继承首动作（守卫征兵只在无前例时兜底）
-    assert plan["turns"][2]["actions"] == [{"action": "invest", "province_id": 1, "gold": 500}]
-    plan2 = {"turns": [{"offset": 1, "actions": []}]}
-    _fill_empty_turns(plan2, {"tech_points": 12, "my_provinces": [7]})
-    assert plan2["turns"][0]["actions"][0]["action"] == "invest_tech"
-    # 首回合即空且无科技点 -> 守卫征兵（最后兜底）
-    plan3 = {"turns": [{"offset": 1, "actions": [], "note": ""}, {"offset": 2, "actions": []}]}
-    _fill_empty_turns(plan3, {"tech_points": 0, "my_provinces": [7]})
-    assert plan3["turns"][0]["actions"][0]["action"] == "recruit_army"
+def test_empty_plan_superseded_by_cadence_flow():
+    """旧批量计划已由范式切换替代（R006）；该测试验证 cadence 可正常判定节拍而非依赖 plan turns."""
+    from agent.mechanics.cadence import CadenceTracker
+    c = CadenceTracker()
+    c.mark_decision(1, {"provinces": 10, "wars": [], "messages": 0, "msg_types": ""})
+    assert c.should_decide(3, {"provinces": 10, "wars": [], "messages": 0, "msg_types": ""})[0] is True
 
 
 def test_victory_progress_budget_sliders():

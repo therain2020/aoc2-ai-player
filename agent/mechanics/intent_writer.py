@@ -170,6 +170,42 @@ def _front_province(st: dict, target: int | None) -> int:
     return _border_province(st)
 
 
+def enrich_actions(actions: list[dict], text: str, st: dict,
+                   danger: dict | None = None) -> list[str]:
+    """R007: inject immediately into a single-turn decision's action list."""
+    notes: list[str] = []
+    if not actions:
+        return notes
+    existing = {(a.get("action"), a.get("target_civ_id")) for a in actions}
+    intents = detect_intents(text)
+    if danger:
+        intents = _preempt_intent(intents, {"turns": [{"actions": actions}]}, danger, st)
+    for intent in intents:
+        if not _budget_ok(intent, st):
+            continue
+        params = resolve_params(intent, st, text)
+        steps = _RULE_STEPS.get(intent, [])
+        for action, tmpl in steps[:2]:          # 单回合注入 ≤2 步（焦点优先）
+            real = {}
+            for k, v in tmpl.items():
+                if v in params:
+                    real[k] = params[v]
+                elif v == "border_prov":
+                    real[k] = _border_province(st)
+                elif v in ("front_prov", "target_prov"):
+                    real[k] = _front_province(st, params.get("target"))
+                elif v == "gold":
+                    real[k] = params.get("gold", 500)
+                else:
+                    real[k] = v
+            if (action, real.get("target_civ_id")) in existing:
+                continue
+            actions.append({"action": action, **real})
+            existing.add((action, real.get("target_civ_id")))
+            notes.append(f"{intent}:{action}")
+    return notes
+
+
 def enrich(plan: dict, brief: str, st: dict, danger: dict | None = None) -> list[str]:
     """Full harness correction pass: DANGER preempt + intent detection + injection."""
     text = str(brief or "")

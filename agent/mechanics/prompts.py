@@ -114,6 +114,37 @@ def build_war_system() -> str:
     )
 
 
+def build_vision_system() -> str:
+    """FR-008 revised: 10-turn textual vision — direction only, NO per-turn actions."""
+    return (
+        "直接输出JSON，禁止任何思考过程或解释。你是《文明时代2》的战略家，"
+        "为未来 10 回合拟定一个**文字愿景**（方向与目标，不含回合动作表）。输出仅：\n"
+        "{brief: ≤120 字的一句话方向（必须含'我方 vs 最强邻国'的国力对比判断与获胜路径），"
+        "focus: [最多 3 个优先事项]}。\n"
+        "依据：下方状态中的【资源台账】【胜利进展】【危险信号】【战略档位】；"
+        "愿景服务于获胜条件（领土统治/科技），不写战斗序列细节。\n\n"
+        + mechanic_guidance()
+    )
+
+
+def build_turn_system(gear_idx: int | None = None) -> str:
+    """Per-turn autonomous decision system (paradigm switch 2026-08-29).
+
+    The agent allocates THIS turn's resources (actions are single-turn;
+    reserve discipline comes from the ctx ReservePolicy line).
+    """
+    gear_part = ""
+    if gear_idx and gear_idx in GEAR_POLICY:
+        gear_part = gear_policy(gear_idx) + "\n"
+    return (
+        "直接输出JSON（{actions:[...], brief:\"...\"}），禁止任何思考过程或解释。"
+        "你是《文明时代2》的决策者：围绕当前最重要的事分配**本回合**资源"
+        "（行动点/金/外交点/科技点）；数量由局面决定，焦点优先，无数量预置。\n"
+        + gear_part
+        + actions_prompt_spec()
+    )
+
+
 def plan_turn_closing(cur: int) -> str:
     return (f"\n当前回合 {cur}。请一次性规划未来 10 回合（当前回合算第 1 回合）；"
             "brief 必须写明我方 vs 最强邻国的国力对比判断。")
