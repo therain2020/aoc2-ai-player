@@ -97,3 +97,28 @@ def war_turn_closing() -> str:
     return ("\n【战争状态】当前正与邻国交战。请给出下一回合的战争操作（1-3 个动作），重点："
             "推进军队到前线、征募新兵、必要时和谈；僵局判定：最后交火>39/49+回合无占领/"
             "战争>299 → peace_treaty 止损。")
+
+
+GOLD_SAFE = 500
+
+
+def budget_guard(ledger: dict) -> str:
+    """T015-followup: gold-floor guard (gold<GOLD_SAFE or negative net income).
+
+    The engine correctly rejects invest/invest_dev when money<0 (precondition
+    nMoney>0), so repeated failed sends waste actions (and prompt LLM turns);
+    better to forbid gold actions outright while the coffer is low.
+    """
+    try:
+        gold = int(ledger.get("gold") or 0)
+    except (TypeError, ValueError):
+        return ""
+    inc = ledger.get("income") or {}
+    gold_net = inc.get("gold")
+    net_neg = isinstance(gold_net, (int, float)) and gold_net < 0
+    if gold < GOLD_SAFE or net_neg:
+        net_s = f"{gold_net}/回合" if gold_net is not None else "?"
+        return (f"【预算护栏】金库 {gold}（净收益 {net_s}）不足：本回合禁止一切金币动作"
+                "（invest / invest_dev / send_gift / support_rebels / construct / move_capital）；"
+                "只允许征兵 / 投科技点 / 军事移动 / 零成本外交（send_insult 等）。")
+    return ""

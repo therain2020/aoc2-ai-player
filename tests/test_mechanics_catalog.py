@@ -50,3 +50,13 @@ def test_plan_spec_has_budget_and_principles():
     spec = prompts.plan_batch_spec()
     assert "资源台账" in spec and "成本四原则" in spec and "tactic_ref" in spec
     assert "封顶" in spec
+
+
+def test_budget_guard_low_gold_blocks_gold_actions():
+    guard = prompts.budget_guard({"gold": -90, "income": {"gold": -3, "diplo": 8}})
+    assert "预算护栏" in guard and "禁止一切金币动作" in guard
+    assert "invest" in guard
+    g_rich = prompts.budget_guard({"gold": 5000, "income": {"gold": 120, "diplo": 3}})
+    assert g_rich == ""
+    g_edge = prompts.budget_guard({"gold": 500, "income": {}})
+    assert g_edge == ""  # 500 == GOLD_SAFE 不算低

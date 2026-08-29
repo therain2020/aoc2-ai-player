@@ -339,7 +339,7 @@ def main():
                 strat = read_strategy(game_root)
                 if strat:
                     ctx = f"【用户战略指示】{strat}\n" + ctx
-                ctx = (f"{ledger_line(ledger)}\n{phase_note}\n"
+                ctx = (f"{ledger_line(ledger)}\n{mech_prompts.budget_guard(ledger)}\n{phase_note}\n"
                        + set_msg_lines(ctx_store, st)
                        + ctx
                        + "\n" + assessment
@@ -424,7 +424,7 @@ def main():
                 ctx = build_turn_context(st, history)
                 if strat:
                     ctx = f"【用户战略指示】{strat}\n" + ctx
-                ctx = (f"{ledger_line(ledger)}\n{phase_note}\n"
+                ctx = (f"{ledger_line(ledger)}\n{mech_prompts.budget_guard(ledger)}\n{phase_note}\n"
                        + set_msg_lines(ctx_store, st)
                        + ctx
                        + mech_prompts.plan_turn_closing(cur))
