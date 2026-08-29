@@ -177,17 +177,16 @@ def str_sig(s: str) -> str:
     return hashlib.md5((s or "").encode("utf-8")).hexdigest()
 
 
-def _auto_clear_stale_pause(game_root: str) -> None:
-    """A stale auto-pause (3x consecutive LLM failures from an old session)
-    silently blocks every new run — clear it at startup; manual dashboard
-    pauses use a different marker and are respected."""
+def _pause_status(game_root: str) -> str:
+    """Pause source summary at startup — NEVER auto-delete (user pauses are sacred)."""
     p = Path(game_root) / "aoc2_pause.txt"
     try:
-        if p.exists() and "3 consecutive LLM failures" in p.read_text(encoding="utf-8", errors="replace"):
-            p.unlink()
-            print("cleared stale auto-pause (previous session's 3x LLM failures)", flush=True)
+        if not p.exists():
+            return ""
+        first = p.read_text(encoding="utf-8", errors="replace").splitlines()[0]
+        return f"pause file detected: {first or '(no marker)'} — agent waits; resume by deleting it"
     except OSError:
-        pass
+        return ""
 
 
 class WarTracker:
@@ -278,7 +277,9 @@ def main():
         sys.exit(2)
     global CONFIG_GAME_ROOT
     CONFIG_GAME_ROOT = game_root
-    _auto_clear_stale_pause(game_root)
+    note = _pause_status(game_root)
+    if note:
+        print(note, flush=True)
 
     ctx_store = CtxStore(Path(game_root) / "aoc2_context.json")
 
@@ -319,9 +320,11 @@ def main():
             "tokens": dict(provider.last_usage), "tokens_cum": dict(provider.total),
         })
         if fail_streak >= 3:
+            import datetime
             (Path(game_root) / "aoc2_pause.txt").write_text(
-                "agent: 3 consecutive LLM failures", encoding="utf-8")
-            print("ALERT: 3 consecutive LLM failures -> paused (aoc2_pause.txt); "
+                "#auto:3x-llm-failures " + datetime.datetime.now().isoformat(timespec="seconds")
+                + "\nagent: 3 consecutive LLM failures", encoding="utf-8")
+            print("ALERT: 3 consecutive LLM failures -> paused (aoc2_pause.txt, #auto marker); "
                   "resume by deleting the file", flush=True)
         try:
             _auto_invest_tech(bridge, st)

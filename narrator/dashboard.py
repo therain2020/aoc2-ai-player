@@ -8,24 +8,22 @@ Usage: python -m narrator.dashboard [--port 8080] [--session <dir>]
 """
 import argparse
 import json
+import sys
 import time
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+from agent.mechanics.gears import GEAR_TEXT  # noqa: E402
 # T014: 桥端口统一 7187（旧 9110 已退役）
 BRIDGE = "http://127.0.0.1:7187"
 
-# 六档战略（与旧桥 STRATEGIES 一致；dashbord 写 aoc2_strategy.txt 全文）
-GEARS = [
-    "①稳扎稳打：优先内政发展，只在极有把握时扩张",
-    "②均衡发展：内政与军备并举，伺机扩张",
-    "③积极扩张：主动征兵扩军，有优势即开战",
-    "④疯狂扩张：全力军事化，持续战争扩张",
-    "⑤外交结盟：积极结盟，借力扩张",
-    "⑥全面防御：停止扩张，巩固国防与内政",
-]
+# 六档战略（单一来源：agent/mechanics/gears.py GEAR_TEXT）
+GEARS = GEAR_TEXT
 
 # ---- bridge /state TTL 2s cache ----
 _state_cache = {"ts": 0.0, "body": {}}
@@ -101,6 +99,23 @@ def read_strategy_file() -> str:
     return ""
 
 
+def pause_meta() -> dict:
+    """(exists, by, ts) — pause file metadata (first line marker)."""
+    p = game_root() / "aoc2_pause.txt"
+    if not p.exists():
+        return {"paused": False, "pause_by": None, "pause_ts": None}
+    by, ts = None, None
+    try:
+        first = p.read_text(encoding="utf-8", errors="replace").splitlines()[0]
+        if first.startswith("#"):
+            parts = first.lstrip("#").split(" ", 1)
+            by = parts[0]
+            ts = parts[1] if len(parts) > 1 else None
+    except OSError:
+        pass
+    return {"paused": True, "pause_by": by or "unknown", "pause_ts": ts}
+
+
 def is_paused() -> bool:
     return (game_root() / "aoc2_pause.txt").exists()
 
@@ -128,8 +143,10 @@ def apply_strategy_text(value) -> bool:
 
 def apply_pause(value) -> bool:
     p = game_root() / "aoc2_pause.txt"
+    import datetime
+    stamp = datetime.datetime.now().isoformat(timespec="seconds")
     if value is True or (isinstance(value, str) and value.lower() in ("1", "true", "yes")):
-        p.write_text("paused", encoding="utf-8")
+        p.write_text(f"#user:dashboard {stamp}\npaused", encoding="utf-8")
         return True
     if value is False or (isinstance(value, str) and value.lower() in ("0", "false", "no")):
         if p.exists():
@@ -139,7 +156,7 @@ def apply_pause(value) -> bool:
         if p.exists():
             p.unlink()
         else:
-            p.write_text("paused", encoding="utf-8")
+            p.write_text(f"#user:dashboard {stamp}\npaused", encoding="utf-8")
         return True
     return False
 
@@ -397,12 +414,31 @@ poll();
 PAGE = PAGE.replace("/*__GEARS__*/", json.dumps(GEARS, ensure_ascii=False))
 
 
+_newest_session_cache: dict = {}
+
+
+def _newest_session_dir() -> None:
+    """Follow the newest agent session (poll-time); dashboard survives re-games."""
+    base = Path(REPO / "sessions")
+    if not base.exists():
+        Handler.session_dir = None
+        return
+    cands = [d for d in base.iterdir() if d.is_dir() and "agent" in d.name]
+    if not cands:
+        Handler.session_dir = None
+        return
+    newest = max(cands, key=lambda d: d.stat().st_mtime)
+    if Handler.session_dir != newest:
+        Handler.session_dir = newest
+
+
 class Handler(BaseHTTPRequestHandler):
     session_dir = None
     tokens = {"prompt_tokens": 0, "completion_tokens": 0, "calls": 0}
     balance = None
     cost_in = 2.0
     cost_out = 8.0
+    auto_follow = True
     model = ""
 
     def _json(self, obj, status: int = 200):
@@ -414,6 +450,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
+        if Handler.auto_follow:
+            _newest_session_dir()
         if self.path == "/":
             data = PAGE.encode("utf-8")
             self.send_response(200)
@@ -451,6 +489,8 @@ class Handler(BaseHTTPRequestHandler):
             "state": st,
             "strategy": read_strategy_file(),
             "paused": is_paused(),
+            "pause_by": pause_meta().get("pause_by"),
+            "pause_ts": pause_meta().get("pause_ts"),
             "session": self.session_dir.name if self.session_dir else "",
         }
         # per-turn records → 曲线 + 最新机制阶段
@@ -521,12 +561,9 @@ def main():
         pass
     if args.session:
         Handler.session_dir = Path(args.session)
+        Handler.auto_follow = False
     else:
-        base = REPO / "sessions"
-        if base.exists():
-            dirs = [d for d in base.iterdir() if d.is_dir() and "agent" in d.name]
-            if dirs:
-                Handler.session_dir = max(dirs, key=lambda d: d.stat().st_mtime)
+        _newest_session_dir()
     if Handler.session_dir:
         for t in load_turns(Handler.session_dir):
             if t.get("tokens_cum"):
