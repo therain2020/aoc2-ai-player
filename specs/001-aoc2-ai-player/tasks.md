@@ -123,7 +123,7 @@
 
 - [ ] T039 [US5] `recorder/`（或 agent/state.py 落盘处）turns.jsonl 字段扩展：ledger + mechanic_phase + tactic_ref + war events + game_end 信号（data-model §6）
 - [x] T040 [US5] [P] `narrator/dashboard.py` 数据流 ≤2s：轮询 + 增量渲染决策流/资源曲线/余额（复用既有 token 面板）
-- [ ] T041 [US5] [P] `narrator/timeline.py` 兼容扩展字段（mechanic_phase/tactic_ref 显示卡片）
+- [x] T041 [US5] [P] `narrator/timeline.py` 兼容扩展字段（mechanic_phase/tactic_ref 显示卡片）
 - [ ] T042 [US5] US5 独立验收（quickstart §4-5/§3 复用）：timeline 完整 + dashboard 最新值断言脚本
 
 **Checkpoint**: 素材链路（用户剪辑目标）全量可出

@@ -47,6 +47,12 @@ def render(turns: list, session_name: str) -> str:
         results = "".join(
             f'<span class="res {("ok" if r.get("result","").startswith("OK") else "fail")}">{r.get("result", "")}</span>'
             for r in t.get("results", []))
+        # T041: mechanic-phase / tactic-ref 卡片（兼容旧行：字段缺失则不渲染）
+        mech = ""
+        if t.get("mechanic_phase"):
+            mech += '<span class="chip phase">阶段: {}</span>'.format(t["mechanic_phase"])
+        if t.get("tactic_ref"):
+            mech += '<span class="chip tactic">tactic: {}</span>'.format(t["tactic_ref"])
         cards.append(f"""
         <div class="card">
           <div class="head">
@@ -55,6 +61,7 @@ def render(turns: list, session_name: str) -> str:
             <span class="stats">{stats}</span>
           </div>
           <div class="brief">{t.get('brief', '')}</div>
+          <div class="mech">{mech}</div>
           <div class="actions">{actions}</div>
           <div class="results">{results}</div>
         </div>""")
@@ -70,8 +77,10 @@ def render(turns: list, session_name: str) -> str:
  .ts{{color:#7c8698;font-size:12px}}
  .stats{{color:#9db4d0;font-size:13px}}
  .brief{{font-size:15px;line-height:1.6;margin-bottom:10px}}
- .actions{{margin-bottom:8px}}
+ .mech{{margin-bottom:8px}}
  .chip{{display:inline-block;background:#263041;border:1px solid #34435c;color:#b8c7dd;border-radius:6px;padding:2px 8px;margin:2px 4px 2px 0;font-size:12px}}
+ .chip.phase{{border-color:#2c6e6a;color:#9adfd8}}
+ .chip.tactic{{border-color:#8a6bc0;color:#c9b3f0}}
  .res{{display:inline-block;border-radius:6px;padding:2px 8px;margin:2px 4px 2px 0;font-size:11px}}
  .res.ok{{background:#16301f;color:#7fd99a;border:1px solid #27573a}}
  .res.fail{{background:#351c1c;color:#f0a1a1;border:1px solid #6b3434}}
