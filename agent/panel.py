@@ -99,6 +99,7 @@ def _gateway_pids():
 
 
 def stop_agent():
+    """Stop the Agent python processes ONLY — the game window stays untouched."""
     pid = read_pid()
     if not pid:
         print("  no pid record (falling back to commandline scan)")
@@ -107,13 +108,25 @@ def stop_agent():
         subprocess.run(["taskkill", "/PID", str(p), "/F", "/T"],
                        capture_output=True, shell=True)
         cleaned += 1
-    for p in _gateway_pids():
-        subprocess.run(["taskkill", "/PID", str(p), "/F", "/T"],
-                       capture_output=True, shell=True)
-        cleaned += 1
     if PID_FILE.exists():
         PID_FILE.unlink()
-    print(f"  stopped {cleaned} process(es) (agent + gateway)")
+    print(f"  stopped {cleaned} agent process(es) — 游戏进程保留")
+
+
+def stop_game():
+    """Kill the game process carrying the gateway (menu 5, explicit confirm)."""
+    pids = _gateway_pids()
+    if not pids:
+        print("  no game/gateway process found")
+        return
+    ans = input(f"  关闭网关 = 关闭游戏进程 {pids}（未保存进度会丢失），确认? (y/n) > ").strip().lower()
+    if ans not in ("y", "yes"):
+        print("  cancelled")
+        return
+    for p in pids:
+        subprocess.run(["taskkill", "/PID", str(p), "/F", "/T"],
+                       capture_output=True, shell=True)
+    print(f"  stopped game (gateway) process(es): {pids}")
 
 
 def _agent_pids():
@@ -150,21 +163,81 @@ def start_game():
     print(f"  game launched (pid {proc.pid}), bridge should come up at {BRIDGE}")
 
 
+def _config():
+    import yaml
+    cfg_path = REPO / "config.yaml"
+    if not cfg_path.exists():
+        return {}
+    try:
+        return yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return {}
+
+
+def _latest_turn_summary():
+    """(session_dir_name, rows, last_record) from the newest agent session turns.jsonl."""
+    base = REPO / "sessions"
+    if not base.exists():
+        return None
+    import json
+    paths = sorted(base.glob("*agent*/turns.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not paths:
+        return None
+    p = paths[0]
+    n = 0
+    last = None
+    try:
+        with p.open("r", encoding="utf-8") as f:
+            for line in f:
+                n += 1
+                last = json.loads(line)
+    except (OSError, json.JSONDecodeError):
+        pass
+    return (p.parent.name, n, last)
+
+
 def show_status():
-    pid = read_pid()
-    alive = pid and is_alive(pid)
-    print(f"  recorded pid: {pid}   process alive: {'yes' if alive else 'no'}")
+    agent_pids = _agent_pids()
+    recorded = read_pid()
+    alive = recorded and is_alive(recorded)
+    print(f"  agent: recorded pid {recorded} | alive {'yes' if alive else 'no'} | "
+          f"cmdline pids {agent_pids or '--'}")
     try:
         import json
         import urllib.request
         with urllib.request.urlopen(BRIDGE + "/state", timeout=2) as r:
             st = json.loads(r.read().decode())
-        print(f"  bridge: online | turn {st.get('turn')} | state {st.get('turn_state')} "
-              f"| in_game {st.get('in_game')} | money {st.get('money')} units {st.get('units')}")
+        print(f"  bridge: online | T{st.get('turn')} {st.get('date', '')} | {st.get('turn_state')} "
+              f"| in_game {st.get('in_game')} | 金{st.get('money')} 军{st.get('units')} "
+              f"省{st.get('provinces')} 科技点{st.get('tech_points')} 外交点{st.get('diplomacy_points')}")
     except Exception as e:
         print(f"  bridge: offline ({e})")
-    log_size = LOG_FILE.stat().st_size if LOG_FILE.exists() else 0
-    print(f"  log size: {log_size} bytes")
+    rec = _latest_turn_summary()
+    if rec is None:
+        print("  session: 尚无 agent 回合记录（turns.jsonl）")
+    else:
+        dn, rows, last = rec
+        if last is None:
+            print(f"  session: {dn} | turns.jsonl 空文件")
+        else:
+            ok = sum(1 for r in (last.get("results") or []) if str(r.get("result", "")).startswith("OK"))
+            print(f"  session: {dn} | turns.jsonl {rows} 行 | 最新 T{last.get('turn')} "
+                  f"type={last.get('type')} brief={str(last.get('brief'))[:40]} "
+                  f"ok={ok}/{len(last.get('results') or [])}")
+            if last.get("fail_reason"):
+                print(f"  ⚠ 上次回合 FAIL: {last.get('fail_reason')}")
+    root = (_config().get("game") or {}).get("root", "")
+    if root:
+        pause = Path(root) / "aoc2_pause.txt"
+        strat = Path(root) / "aoc2_strategy.txt"
+        strat_s = ""
+        if strat.exists():
+            try:
+                strat_s = strat.read_text(encoding="utf-8").strip()[:120]
+            except Exception:
+                strat_s = "(读取失败)"
+        print(f"  暂停(END): {'存在=已暂停' if pause.exists() else '无'} | 用户战略: {strat_s or '（无）'}")
+    print(f"  log: logs/agent.log {LOG_FILE.stat().st_size if LOG_FILE.exists() else 0} bytes")
 
 
 def main():
@@ -172,7 +245,8 @@ def main():
         os.system("chcp 65001 > nul")
     print("=== AoC2 Agent Control Panel ===")
     while True:
-        print("\n1) Start agent   2) Stop agent   3) Status   4) Start game (gateway)   0) Exit")
+        print("\n1) Start agent   2) Stop agent   3) Status   4) Start game (gateway)"
+              "   5) Stop game   0) Exit")
         try:
             choice = input("> ").strip()
         except (EOFError, KeyboardInterrupt):
@@ -185,6 +259,8 @@ def main():
             show_status()
         elif choice == "4":
             start_game()
+        elif choice == "5":
+            stop_game()
         elif choice == "0":
             break
         else:
