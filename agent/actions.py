@@ -1,6 +1,8 @@
 """Semantic actions: LLM output validation and bridge execution mapping."""
 import json
 
+from agent.mechanics import catalog
+
 ACTION_SPEC = {
     "declare_war": {"target_civ_id": int},
     "recruit_army": {"province_id": int, "count": int},
@@ -107,7 +109,11 @@ def execute(bridge, actions: list) -> list:
 
 
 def parse_plan(raw: str, max_turns: int = 10) -> dict:
-    """Parse batch-plan LLM output: {brief, turns:[{offset, actions:[...]}]}."""
+    """Parse batch-plan LLM output: {brief, turns:[{offset, actions:[...]}]}.
+
+    T031: per-turn tactic_ref (if present) must be a VERIFIED mechanic id
+    (SC-009); legacy plan without tactic_ref is bagged into the `no_ref` count.
+    """
     text = raw.strip()
     if text.startswith("```"):
         text = text.split("```")[1]
@@ -119,7 +125,9 @@ def parse_plan(raw: str, max_turns: int = 10) -> dict:
         data = {"turns": data}
     if not isinstance(data, dict) or "turns" not in data:
         raise ActionError("plan must contain turns list")
+    verified = catalog.verified_ids()
     turns = []
+    no_ref = 0
     for t in data["turns"][:max_turns]:
         entry: dict = {
             "offset": int(t.get("offset", len(turns) + 1)),
@@ -127,10 +135,17 @@ def parse_plan(raw: str, max_turns: int = 10) -> dict:
         }
         if t.get("note"):
             entry["note"] = str(t["note"])[:60]
+        tac = t.get("tactic_ref")
+        if tac:
+            if tac not in verified:
+                raise ActionError(f"unverified tactic_ref: {tac}")
+            entry["tactic_ref"] = tac
+        else:
+            no_ref += 1
         turns.append(entry)
     if not turns:
         raise ActionError("empty plan")
-    return {"brief": str(data.get("brief", ""))[:80], "turns": turns}
+    return {"brief": str(data.get("brief", ""))[:80], "turns": turns, "no_ref": no_ref}
 
 
 def _validate_actions(raw_actions: list) -> list:
